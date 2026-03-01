@@ -1,6 +1,6 @@
 # 2026_1_DavaiDavaiDeploy
 
-Репозиторий команды "Davai Davai Deploy". Проект: DDDance
+Репозиторий бэкенда команды "Davai Davai Deploy". Проект: DDDance
 
 ### Участники команды
 1. [Старкин Александр](https://github.com/Robocotik)
