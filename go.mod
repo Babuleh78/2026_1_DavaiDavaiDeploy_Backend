@@ -10,6 +10,7 @@ require (
 	github.com/jackc/pgx/v4 v4.18.3
 	github.com/satori/go.uuid v1.2.0
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
+	go.uber.org/mock v0.6.0
 	golang.org/x/crypto v0.46.0
 	google.golang.org/grpc v1.79.1
 )

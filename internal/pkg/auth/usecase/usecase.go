@@ -71,14 +71,6 @@ func (uc *AuthUsecase) ParseToken(token string) (*jwt.Token, error) {
 	})
 }
 
-func (uc *AuthUsecase) AddNotification(ctx context.Context, userID uuid.UUID) error {
-	err := uc.authRepo.AddNotification(ctx, userID)
-	if err != nil {
-		return auth.ErrorInternalServerError
-	}
-	return nil
-}
-
 func (uc *AuthUsecase) SignInVKUser(ctx context.Context, vkid string) (models.User, string, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 	vkUser, err := uc.authRepo.GetVKUser(ctx, vkid)
@@ -265,7 +257,7 @@ func (uc *AuthUsecase) GenerateQRCode(login string) ([]byte, string, error) {
 
 	secretBase32 := base32.StdEncoding.EncodeToString(secret)
 
-	issuer := "ddfilms"
+	issuer := "dddance"
 	otpURL := fmt.Sprintf("otpauth://totp/%s:%s?secret=%s&issuer=%s",
 		url.PathEscape(issuer),
 		url.PathEscape(login),
