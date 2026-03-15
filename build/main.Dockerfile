@@ -1,4 +1,4 @@
-FROM golang:1.24.0-alpine AS builder
+FROM golang:1.24.7-alpine AS builder
 
 COPY .. /github.com/Elizaveta-Makeeva/2026_1_DavaiDavaiDeploy_Backend/
 WORKDIR /github.com/Elizaveta-Makeeva/2026_1_DavaiDavaiDeploy_Backend/
