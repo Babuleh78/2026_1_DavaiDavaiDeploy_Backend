@@ -26,6 +26,8 @@ const (
 	Auth_ChangePassword_FullMethodName     = "/auth.Auth/ChangePassword"
 	Auth_ChangeAvatar_FullMethodName       = "/auth.Auth/ChangeAvatar"
 	Auth_ValidateAndGetUser_FullMethodName = "/auth.Auth/ValidateAndGetUser"
+	Auth_Enable2Fa_FullMethodName          = "/auth.Auth/Enable2fa"
+	Auth_Disable2Fa_FullMethodName         = "/auth.Auth/Disable2fa"
 	Auth_SignUpUserVK_FullMethodName       = "/auth.Auth/SignUpUserVK"
 	Auth_SignInUserVK_FullMethodName       = "/auth.Auth/SignInUserVK"
 )
@@ -41,6 +43,8 @@ type AuthClient interface {
 	ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 	ChangeAvatar(ctx context.Context, in *ChangeAvatarRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 	ValidateAndGetUser(ctx context.Context, in *ValidateAndGetUserRequest, opts ...grpc.CallOption) (*UserResponse, error)
+	Enable2Fa(ctx context.Context, in *Enable2FaRequest, opts ...grpc.CallOption) (*Enable2FaResponse, error)
+	Disable2Fa(ctx context.Context, in *Disable2FaRequest, opts ...grpc.CallOption) (*Disable2FaResponse, error)
 	SignUpUserVK(ctx context.Context, in *SignupVKRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 	SignInUserVK(ctx context.Context, in *SignupVKRequest, opts ...grpc.CallOption) (*AuthResponse, error)
 }
@@ -123,6 +127,26 @@ func (c *authClient) ValidateAndGetUser(ctx context.Context, in *ValidateAndGetU
 	return out, nil
 }
 
+func (c *authClient) Enable2Fa(ctx context.Context, in *Enable2FaRequest, opts ...grpc.CallOption) (*Enable2FaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Enable2FaResponse)
+	err := c.cc.Invoke(ctx, Auth_Enable2Fa_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authClient) Disable2Fa(ctx context.Context, in *Disable2FaRequest, opts ...grpc.CallOption) (*Disable2FaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Disable2FaResponse)
+	err := c.cc.Invoke(ctx, Auth_Disable2Fa_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authClient) SignUpUserVK(ctx context.Context, in *SignupVKRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(AuthResponse)
@@ -154,6 +178,8 @@ type AuthServer interface {
 	ChangePassword(context.Context, *ChangePasswordRequest) (*AuthResponse, error)
 	ChangeAvatar(context.Context, *ChangeAvatarRequest) (*AuthResponse, error)
 	ValidateAndGetUser(context.Context, *ValidateAndGetUserRequest) (*UserResponse, error)
+	Enable2Fa(context.Context, *Enable2FaRequest) (*Enable2FaResponse, error)
+	Disable2Fa(context.Context, *Disable2FaRequest) (*Disable2FaResponse, error)
 	SignUpUserVK(context.Context, *SignupVKRequest) (*AuthResponse, error)
 	SignInUserVK(context.Context, *SignupVKRequest) (*AuthResponse, error)
 	mustEmbedUnimplementedAuthServer()
@@ -186,6 +212,12 @@ func (UnimplementedAuthServer) ChangeAvatar(context.Context, *ChangeAvatarReques
 }
 func (UnimplementedAuthServer) ValidateAndGetUser(context.Context, *ValidateAndGetUserRequest) (*UserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ValidateAndGetUser not implemented")
+}
+func (UnimplementedAuthServer) Enable2Fa(context.Context, *Enable2FaRequest) (*Enable2FaResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Enable2Fa not implemented")
+}
+func (UnimplementedAuthServer) Disable2Fa(context.Context, *Disable2FaRequest) (*Disable2FaResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Disable2Fa not implemented")
 }
 func (UnimplementedAuthServer) SignUpUserVK(context.Context, *SignupVKRequest) (*AuthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SignUpUserVK not implemented")
@@ -340,6 +372,42 @@ func _Auth_ValidateAndGetUser_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Auth_Enable2Fa_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Enable2FaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).Enable2Fa(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_Enable2Fa_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).Enable2Fa(ctx, req.(*Enable2FaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Auth_Disable2Fa_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Disable2FaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).Disable2Fa(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_Disable2Fa_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).Disable2Fa(ctx, req.(*Disable2FaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Auth_SignUpUserVK_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SignupVKRequest)
 	if err := dec(in); err != nil {
@@ -410,6 +478,14 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ValidateAndGetUser",
 			Handler:    _Auth_ValidateAndGetUser_Handler,
+		},
+		{
+			MethodName: "Enable2fa",
+			Handler:    _Auth_Enable2Fa_Handler,
+		},
+		{
+			MethodName: "Disable2fa",
+			Handler:    _Auth_Disable2Fa_Handler,
 		},
 		{
 			MethodName: "SignUpUserVK",

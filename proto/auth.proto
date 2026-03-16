@@ -10,7 +10,9 @@ service Auth {
   rpc ChangePassword(ChangePasswordRequest) returns (AuthResponse) {}
   rpc ChangeAvatar(ChangeAvatarRequest) returns (AuthResponse) {}
   rpc ValidateAndGetUser(ValidateAndGetUserRequest) returns (UserResponse) {}
-  
+
+  rpc Enable2fa(Enable2faRequest) returns (Enable2faResponse) {}
+  rpc Disable2fa(Disable2faRequest) returns (Disable2faResponse) {}
   rpc SignUpUserVK(SignupVKRequest) returns (AuthResponse) {}
   rpc SignInUserVK(SignupVKRequest) returns (AuthResponse) {}
 }
@@ -18,6 +20,25 @@ service Auth {
 message SignupVKRequest {
   optional string Login = 1;
   string VkID = 2;
+}
+
+message Enable2faRequest {
+  string ID = 1;
+  bool Has2fa = 2;
+}
+
+message Enable2faResponse {
+  bool Has2fa = 1;
+  bytes QrCode = 2;
+}
+
+message Disable2faRequest {
+  string ID = 1;
+  bool Has2fa = 2;
+}
+
+message Disable2faResponse {
+  bool Has2fa = 1;
 }
 
 message EmptyResponse {}

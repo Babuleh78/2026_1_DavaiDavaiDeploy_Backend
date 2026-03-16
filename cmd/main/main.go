@@ -20,6 +20,7 @@ import (
 	authUsecase "DDDance/internal/pkg/auth/usecase"
 	"DDDance/internal/pkg/middleware/cors"
 	logger "DDDance/internal/pkg/middleware/logger"
+	userHandlers "DDDance/internal/pkg/users/delivery/http"
 	"os"
 
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -78,6 +79,7 @@ func main() {
 	authUsecase := authUsecase.NewAuthUsecase(authRepo)
 
 	authHandler := authHandlers.NewAuthHandler(authClient, authUsecase)
+	userHandler := userHandlers.NewUserHandler(authClient)
 
 	ddLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -100,6 +102,15 @@ func main() {
 	protectedAuthRouter.Use(authHandler.Middleware)
 	protectedAuthRouter.HandleFunc("/check", authHandler.CheckAuth).Methods(http.MethodGet, http.MethodOptions)
 	protectedAuthRouter.HandleFunc("/logout", authHandler.LogOutUser).Methods(http.MethodPost, http.MethodOptions)
+
+	userRouter := apiRouter.PathPrefix("/users").Subrouter()
+
+	// Protected user routes
+	protectedUserRouter := userRouter.PathPrefix("").Subrouter()
+	protectedUserRouter.Use(userHandler.Middleware)
+	protectedUserRouter.HandleFunc("/change/password", userHandler.ChangePassword).Methods(http.MethodPut, http.MethodOptions)
+
+	userRouter.HandleFunc("/{id}", userHandler.GetUser).Methods(http.MethodGet)
 
 	danceSrv := http.Server{
 		Handler: mainRouter,

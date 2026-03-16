@@ -25,6 +25,8 @@ import (
 	authRepo "DDDance/internal/pkg/auth/repo"
 	authUsecase "DDDance/internal/pkg/auth/usecase"
 	"DDDance/internal/pkg/middleware/logger"
+	userRepo "DDDance/internal/pkg/users/repo"
+	userUsecase "DDDance/internal/pkg/users/usecase"
 
 	"DDDance/internal/pkg/auth/delivery/grpc/gen"
 )
@@ -66,9 +68,11 @@ func main() {
 
 	authRepo := authRepo.NewAuthRepository(dbpool)
 	authUsecase := authUsecase.NewAuthUsecase(authRepo)
+	userRepo := userRepo.NewUserRepository(dbpool)
+	userUsecase := userUsecase.NewUserUsecase(userRepo)
 
 	// инициализация gRPC хендлера
-	authHandler := authHandler.NewGrpcAuthHandler(authUsecase)
+	authHandler := authHandler.NewGrpcAuthHandler(authUsecase, userUsecase)
 
 	ddLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	gRPCServer := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.LoggerInterceptor(ddLogger)))

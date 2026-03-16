@@ -4,6 +4,7 @@ import (
 	"DDDance/internal/models"
 	"DDDance/internal/pkg/auth"
 	"DDDance/internal/pkg/auth/delivery/grpc/gen"
+	"DDDance/internal/pkg/users"
 	"context"
 	"os"
 
@@ -15,11 +16,12 @@ import (
 type GrpcAuthHandler struct {
 	JWTSecret string
 	auc       auth.AuthUsecase
+	uuc       users.UsersUsecase
 	gen.UnimplementedAuthServer
 }
 
-func NewGrpcAuthHandler(auc auth.AuthUsecase) *GrpcAuthHandler {
-	return &GrpcAuthHandler{auc: auc, JWTSecret: os.Getenv("JWT_SECRET")}
+func NewGrpcAuthHandler(auc auth.AuthUsecase, uuc users.UsersUsecase) *GrpcAuthHandler {
+	return &GrpcAuthHandler{auc: auc, uuc: uuc, JWTSecret: os.Getenv("JWT_SECRET")}
 }
 
 func (g GrpcAuthHandler) SignupUser(ctx context.Context, in *gen.SignupRequest) (*gen.AuthResponse, error) {
@@ -131,5 +133,61 @@ func (g GrpcAuthHandler) ValidateAndGetUser(ctx context.Context, in *gen.Validat
 		Avatar:    user.Avatar,
 		Has2Fa:    user.Has2FA,
 		IsForeign: user.IsForeign,
+	}, err
+}
+
+func (g GrpcAuthHandler) GetUser(ctx context.Context, in *gen.GetUserRequest) (*gen.UserResponse, error) {
+	neededUser, err := g.uuc.GetUser(ctx, uuid.FromStringOrNil(in.ID))
+	if err != nil {
+		switch err {
+		case users.ErrorNotFound:
+			return nil, status.Errorf(codes.NotFound, "%v", err)
+		default:
+			return nil, status.Errorf(codes.Internal, "%v", err)
+		}
+	}
+	neededUser.Sanitize()
+
+	return &gen.UserResponse{
+		ID:      neededUser.ID.String(),
+		Version: int32(neededUser.Version),
+		Login:   neededUser.Login,
+		Avatar:  neededUser.Avatar,
+	}, err
+}
+
+func (g GrpcAuthHandler) ChangePassword(ctx context.Context, in *gen.ChangePasswordRequest) (*gen.AuthResponse, error) {
+	req := models.ChangePasswordInput{
+		OldPassword: in.OldPassword,
+		NewPassword: in.NewPassword,
+	}
+	req.Sanitize()
+
+	user, token, err := g.uuc.ChangePassword(ctx, uuid.FromStringOrNil(in.UserID), req.OldPassword, req.NewPassword)
+	if err != nil {
+		switch err {
+		case users.ErrorBadRequest:
+			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		case users.ErrorNotFound:
+			return nil, status.Errorf(codes.NotFound, "%v", err)
+		default:
+			return nil, status.Errorf(codes.Internal, "%v", err)
+		}
+	}
+	user.Sanitize()
+
+	csrfToken := uuid.NewV4().String()
+
+	userResponse := &gen.UserResponse{
+		ID:      user.ID.String(),
+		Version: int32(user.Version),
+		Login:   user.Login,
+		Avatar:  user.Avatar,
+	}
+
+	return &gen.AuthResponse{
+		User:      userResponse,
+		JWTToken:  token,
+		CSRFToken: csrfToken,
 	}, err
 }
