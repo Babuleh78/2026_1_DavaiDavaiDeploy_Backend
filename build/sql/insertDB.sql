@@ -1,0 +1,17 @@
+INSERT INTO user_table (id, login, password_hash, avatar) VALUES
+('a1b2c3d4-e5f6-7890-abcd-ef1234567890', 'john_doe', E'\\xc23fafe3872bc4899b6ce0f16a75390f2832fd49783bda5679969541b72b18f2f6b85830d7346544', 'avatars/default-1.png'),
+('b2c3d4e5-f6a7-8901-bcde-f23456789012', 'sarah_miller', E'\\x1f60903aff756d74fb44469a5ebd890deca300f254c7dda633dcb28cb6d96ed953bb6806e887b111', 'avatars/default-2.png'),
+('c3d4e5f6-a7b8-9012-cdef-345678901234', 'mike_johnson', E'\\x387b62a7e51144aea55d35d7ace9cae9706f47f0b6dac7d42d1521e81fe74098d17e157bed62d39d', 'avatars/default-3.png'),
+('d4e5f6a7-b8c9-0123-def4-456789012345', 'marie_dupont', E'\\x328279919aa5a4e2c7529b6b35e9fc1862338005ad29026d5f236c56491d51cceb19be714a3a7776', 'avatars/default-4.png'),
+('e5f6a7b8-c9d0-1234-ef56-567890123456', 'pierre_martin',E'\\x26a6c080424b78040ac4a7e06a9d2dd9bb830bf09003dd8f199883cb99ea6751dd97702ce7109c91', 'avatars/default-5.png'),
+('f6a7b8c9-d0e1-2345-f678-678901234567', 'lisa_wilson',  E'\\x7e7d09aa98b6504de5302e89e53c9b3aaee0fc68ff5fb3809cf63118dd2c9807181efed7696d1f60', 'avatars/default-1.png'),
+('a7b8c9d0-e1f2-3456-789a-789012345678', 'david_brown',  E'\\xd78159dd2a7640bbf0f7e4fdd17a2c62683399841396c4f1eb837b11b02ad50265980fb706056b65', 'avatars/default-2.png'),
+('b8c9d0e1-f2a3-4567-89ab-890123456789', 'ivan_ivanov',  E'\\xef0c1c587efa9cc0d9c1bd42415971636bd80d4cd615ddf3c8352fe05d73b10a23889704cf23f70b', 'avatars/default-3.png'),
+('f2a3b4c5-d6e7-8901-2f34-23456789abcd', 'emma_watson',  E'\\xfc1a23d4abf03c7e1b4ef6e5ab2195a2a81f78315906ce0495f898ebb03f4f178e68082bf54cb77f', 'avatars/default-4.png'),
+('a3b4c5d6-e7f8-9012-3f45-3456789abcde', 'harry_potter', E'\\x4ee6342828c81256bd9112519c80829eeeb04999d93b5e118b9a07a4cd6ae975f962afc35fdef40a', 'avatars/default-5.png'),
+('b4c5d6e7-f8a9-0123-4f56-456789abcdef', 'hans_muller',  E'\\x7df18e0995ee89132d0613a8afbcb96127cbc6b581d301d3e8f1896182f8946417764ce77233ab34', 'avatars/default-1.png'),
+('c5d6e7f8-a9b0-1234-5f67-56789abcdef0', 'anna_schmidt', E'\\x9ccc8a866348dc9d61548d9de8f32d75d1c53e9486b4cda52472f2712c3faf620ab2b96ed1ca2647', 'avatars/default-2.png'),
+('d6e7f8a9-b0c1-2345-6f78-6789abcdef01', 'raj_patel',    E'\\x2369cdda82efe9c642738e98149d0caa086062e85264825ec6c8f970b71550d56afe2dddacb2149b', 'avatars/default-3.png'),
+('e7f8a9b0-c1d2-3456-7f89-789abcdef012', 'priya_sharma', E'\\x4b32f0899f730c78b8dd6ca372cc3ae8068372c211f6ce7a60187f964ca1149cb1ed6597e27dc7cb', 'avatars/default-4.png'),
+('f8a9b0c1-d2e3-4567-8f90-89abcdef0123', 'liam_tremblay',E'\\x84096b2a6dfc83b97271e9328ba63c9ace62f69f11f2b041d0c4644091b4e66b69c910868818f24e', 'avatars/default-5.png'),
+('a9b0c1d2-e3f4-5678-9f01-9abcdef01234', 'sophie_gagnon',E'\\xbba30bacd6740c0b0cf14b107f4ddd80492343e03be7bd10c6e7029f8fe3790e1be77d6159402761', 'avatars/default-1.png');
