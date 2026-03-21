@@ -111,7 +111,7 @@ func main() {
 	protectedUserRouter.HandleFunc("/change/password", userHandler.ChangePassword).Methods(http.MethodPut, http.MethodOptions)
 
 	userRouter.HandleFunc("/load", userHandler.LoadDance).Methods(http.MethodGet)
-	userRouter.HandleFunc("/{id}", userHandler.GetUser).Methods(http.MethodGet)
+	userRouter.HandleFunc("/{id}", userHandler.GetUser).Methods(http.MethodPost)
 
 	danceSrv := http.Server{
 		Handler: mainRouter,
