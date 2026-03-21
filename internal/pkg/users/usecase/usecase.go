@@ -190,7 +190,7 @@ func (uc *UserUsecase) UploadDance(ctx context.Context, buffer []byte, fileForma
 	}
 	logger.Info("video uploaded to S3", "path", dancePath)
 
-	processingURL := "http://localhost:8000/process"
+	processingURL := os.Getenv("ML_SERVICE_URL") + "/process"
 
 	requestBody := map[string]string{
 		"bucket":    os.Getenv("AWS_S3_BUCKET"),
