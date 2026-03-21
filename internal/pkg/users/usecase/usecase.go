@@ -7,8 +7,11 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
 
@@ -182,9 +185,71 @@ func (uc *UserUsecase) UploadDance(ctx context.Context, buffer []byte, fileForma
 
 	dancePath, err := uc.storageRepo.UploadDance(ctx, buffer, fileFormat, danceExtension)
 	if err != nil {
-		logger.Error("failed to upload avatar", "error", err)
+		logger.Error("failed to upload dance", "error", err)
 		return "", 0, 0, 0.0, users.ErrorInternalServerError
 	}
+	logger.Info("video uploaded to S3", "path", dancePath)
 
-	return dancePath, 0, 0, 0.0, nil
+	processingURL := "http://localhost:8000/process"
+
+	requestBody := map[string]string{
+		"bucket":    os.Getenv("AWS_S3_BUCKET"),
+		"video_key": dancePath,
+	}
+
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		logger.Error("failed to marshal request", "error", err)
+		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+	}
+
+	logger.Info("sending request to processing service", "url", processingURL)
+
+	client := &http.Client{
+		Timeout: 60 * time.Second,
+	}
+
+	resp, err := client.Post(processingURL, "application/json", bytes.NewBuffer(jsonBody))
+	if err != nil {
+		logger.Error("failed to call processing service", "error", err)
+		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		logger.Error("failed to read processing service response", "error", err)
+		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		logger.Error("processing service returned error",
+			"status", resp.StatusCode,
+			"body", string(body))
+		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+	}
+
+	var processingResponse struct {
+		ResultKey   string  `json:"result_key"`
+		NumFrames   int     `json:"num_frames"`
+		NumSegments int     `json:"num_segments"`
+		DurationSec float64 `json:"duration_sec"`
+	}
+
+	if err := json.Unmarshal(body, &processingResponse); err != nil {
+		logger.Error("failed to parse processing service response", "error", err)
+		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+	}
+
+	logger.Info("processing completed successfully",
+		"result_key", processingResponse.ResultKey,
+		"num_frames", processingResponse.NumFrames,
+		"num_segments", processingResponse.NumSegments,
+		"duration_sec", processingResponse.DurationSec)
+
+	return processingResponse.ResultKey,
+		processingResponse.NumFrames,
+		processingResponse.NumSegments,
+		processingResponse.DurationSec,
+		nil
 }
