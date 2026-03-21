@@ -36,14 +36,16 @@ func CheckPass(passHash []byte, plainPassword string) bool {
 }
 
 type UserUsecase struct {
-	secret   string
-	userRepo users.UsersRepo
+	secret      string
+	userRepo    users.UsersRepo
+	storageRepo users.StorageRepo
 }
 
-func NewUserUsecase(userRepo users.UsersRepo) *UserUsecase {
+func NewUserUsecase(userRepo users.UsersRepo, storageRepo users.StorageRepo) *UserUsecase {
 	return &UserUsecase{
-		secret:   os.Getenv("JWT_SECRET"),
-		userRepo: userRepo,
+		secret:      os.Getenv("JWT_SECRET"),
+		userRepo:    userRepo,
+		storageRepo: storageRepo,
 	}
 }
 
@@ -162,4 +164,27 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, id uuid.UUID, oldPass
 	}
 
 	return neededUser, token, nil
+}
+
+func (uc *UserUsecase) UploadDance(ctx context.Context, id uuid.UUID, buffer []byte, fileFormat string) (string, error) {
+	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+	var danceExtension string
+	switch fileFormat {
+	case "video/mp4":
+		danceExtension = ".mp4"
+	case "video/quicktime":
+		danceExtension = ".mov"
+	default:
+		logger.Error("invalid format of file")
+		return "", users.ErrorBadRequest
+	}
+
+	dancePath, err := uc.storageRepo.UploadDance(ctx, buffer, fileFormat, danceExtension)
+	if err != nil {
+		logger.Error("failed to upload avatar", "error", err)
+		return "", users.ErrorInternalServerError
+	}
+
+	return dancePath, nil
 }

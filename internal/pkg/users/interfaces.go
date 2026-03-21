@@ -21,3 +21,7 @@ type UsersRepo interface {
 	GetUserByLogin(ctx context.Context, login string) (models.User, error)
 	UpdateUserPassword(ctx context.Context, version int, userID uuid.UUID, passwordHash []byte) error
 }
+
+type StorageRepo interface {
+	UploadDance(ctx context.Context, buffer []byte, fileFormat string, danceExtension string) (string, error)
+}
