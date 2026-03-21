@@ -669,29 +669,28 @@ func (x *ChangePasswordRequest) GetUserID() string {
 	return ""
 }
 
-type ChangeAvatarRequest struct {
+type LoadDanceRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Avatar        []byte                 `protobuf:"bytes,1,opt,name=Avatar,proto3" json:"Avatar,omitempty"`
+	Dance         []byte                 `protobuf:"bytes,1,opt,name=Dance,proto3" json:"Dance,omitempty"`
 	FileFormat    string                 `protobuf:"bytes,2,opt,name=FileFormat,proto3" json:"FileFormat,omitempty"`
-	UserID        string                 `protobuf:"bytes,3,opt,name=UserID,proto3" json:"UserID,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *ChangeAvatarRequest) Reset() {
-	*x = ChangeAvatarRequest{}
+func (x *LoadDanceRequest) Reset() {
+	*x = LoadDanceRequest{}
 	mi := &file_auth_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *ChangeAvatarRequest) String() string {
+func (x *LoadDanceRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ChangeAvatarRequest) ProtoMessage() {}
+func (*LoadDanceRequest) ProtoMessage() {}
 
-func (x *ChangeAvatarRequest) ProtoReflect() protoreflect.Message {
+func (x *LoadDanceRequest) ProtoReflect() protoreflect.Message {
 	mi := &file_auth_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -703,30 +702,91 @@ func (x *ChangeAvatarRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ChangeAvatarRequest.ProtoReflect.Descriptor instead.
-func (*ChangeAvatarRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use LoadDanceRequest.ProtoReflect.Descriptor instead.
+func (*LoadDanceRequest) Descriptor() ([]byte, []int) {
 	return file_auth_proto_rawDescGZIP(), []int{12}
 }
 
-func (x *ChangeAvatarRequest) GetAvatar() []byte {
+func (x *LoadDanceRequest) GetDance() []byte {
 	if x != nil {
-		return x.Avatar
+		return x.Dance
 	}
 	return nil
 }
 
-func (x *ChangeAvatarRequest) GetFileFormat() string {
+func (x *LoadDanceRequest) GetFileFormat() string {
 	if x != nil {
 		return x.FileFormat
 	}
 	return ""
 }
 
-func (x *ChangeAvatarRequest) GetUserID() string {
+type LoadDanceResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ResultKey     string                 `protobuf:"bytes,1,opt,name=ResultKey,proto3" json:"ResultKey,omitempty"`
+	NumFrames     int32                  `protobuf:"varint,2,opt,name=NumFrames,proto3" json:"NumFrames,omitempty"`
+	NumSegments   int32                  `protobuf:"varint,3,opt,name=NumSegments,proto3" json:"NumSegments,omitempty"`
+	DurationSec   float64                `protobuf:"fixed64,4,opt,name=DurationSec,proto3" json:"DurationSec,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LoadDanceResponse) Reset() {
+	*x = LoadDanceResponse{}
+	mi := &file_auth_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LoadDanceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LoadDanceResponse) ProtoMessage() {}
+
+func (x *LoadDanceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[13]
 	if x != nil {
-		return x.UserID
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LoadDanceResponse.ProtoReflect.Descriptor instead.
+func (*LoadDanceResponse) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *LoadDanceResponse) GetResultKey() string {
+	if x != nil {
+		return x.ResultKey
 	}
 	return ""
+}
+
+func (x *LoadDanceResponse) GetNumFrames() int32 {
+	if x != nil {
+		return x.NumFrames
+	}
+	return 0
+}
+
+func (x *LoadDanceResponse) GetNumSegments() int32 {
+	if x != nil {
+		return x.NumSegments
+	}
+	return 0
+}
+
+func (x *LoadDanceResponse) GetDurationSec() float64 {
+	if x != nil {
+		return x.DurationSec
+	}
+	return 0
 }
 
 type LogOutUserRequest struct {
@@ -741,7 +801,7 @@ type LogOutUserRequest struct {
 
 func (x *LogOutUserRequest) Reset() {
 	*x = LogOutUserRequest{}
-	mi := &file_auth_proto_msgTypes[13]
+	mi := &file_auth_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -753,7 +813,7 @@ func (x *LogOutUserRequest) String() string {
 func (*LogOutUserRequest) ProtoMessage() {}
 
 func (x *LogOutUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_proto_msgTypes[13]
+	mi := &file_auth_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -766,7 +826,7 @@ func (x *LogOutUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogOutUserRequest.ProtoReflect.Descriptor instead.
 func (*LogOutUserRequest) Descriptor() ([]byte, []int) {
-	return file_auth_proto_rawDescGZIP(), []int{13}
+	return file_auth_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *LogOutUserRequest) GetID() string {
@@ -805,7 +865,7 @@ type LogOutUserResponse struct {
 
 func (x *LogOutUserResponse) Reset() {
 	*x = LogOutUserResponse{}
-	mi := &file_auth_proto_msgTypes[14]
+	mi := &file_auth_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -817,7 +877,7 @@ func (x *LogOutUserResponse) String() string {
 func (*LogOutUserResponse) ProtoMessage() {}
 
 func (x *LogOutUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_proto_msgTypes[14]
+	mi := &file_auth_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -830,7 +890,7 @@ func (x *LogOutUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use LogOutUserResponse.ProtoReflect.Descriptor instead.
 func (*LogOutUserResponse) Descriptor() ([]byte, []int) {
-	return file_auth_proto_rawDescGZIP(), []int{14}
+	return file_auth_proto_rawDescGZIP(), []int{15}
 }
 
 type ValidateAndGetUserRequest struct {
@@ -842,7 +902,7 @@ type ValidateAndGetUserRequest struct {
 
 func (x *ValidateAndGetUserRequest) Reset() {
 	*x = ValidateAndGetUserRequest{}
-	mi := &file_auth_proto_msgTypes[15]
+	mi := &file_auth_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -854,7 +914,7 @@ func (x *ValidateAndGetUserRequest) String() string {
 func (*ValidateAndGetUserRequest) ProtoMessage() {}
 
 func (x *ValidateAndGetUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_auth_proto_msgTypes[15]
+	mi := &file_auth_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -867,7 +927,7 @@ func (x *ValidateAndGetUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ValidateAndGetUserRequest.ProtoReflect.Descriptor instead.
 func (*ValidateAndGetUserRequest) Descriptor() ([]byte, []int) {
-	return file_auth_proto_rawDescGZIP(), []int{15}
+	return file_auth_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ValidateAndGetUserRequest) GetToken() string {
@@ -923,13 +983,17 @@ const file_auth_proto_rawDesc = "" +
 	"\x15ChangePasswordRequest\x12 \n" +
 	"\vOldPassword\x18\x01 \x01(\tR\vOldPassword\x12 \n" +
 	"\vNewPassword\x18\x02 \x01(\tR\vNewPassword\x12\x16\n" +
-	"\x06UserID\x18\x03 \x01(\tR\x06UserID\"e\n" +
-	"\x13ChangeAvatarRequest\x12\x16\n" +
-	"\x06Avatar\x18\x01 \x01(\fR\x06Avatar\x12\x1e\n" +
+	"\x06UserID\x18\x03 \x01(\tR\x06UserID\"H\n" +
+	"\x10LoadDanceRequest\x12\x14\n" +
+	"\x05Dance\x18\x01 \x01(\fR\x05Dance\x12\x1e\n" +
 	"\n" +
 	"FileFormat\x18\x02 \x01(\tR\n" +
-	"FileFormat\x12\x16\n" +
-	"\x06UserID\x18\x03 \x01(\tR\x06UserID\"k\n" +
+	"FileFormat\"\x93\x01\n" +
+	"\x11LoadDanceResponse\x12\x1c\n" +
+	"\tResultKey\x18\x01 \x01(\tR\tResultKey\x12\x1c\n" +
+	"\tNumFrames\x18\x02 \x01(\x05R\tNumFrames\x12 \n" +
+	"\vNumSegments\x18\x03 \x01(\x05R\vNumSegments\x12 \n" +
+	"\vDurationSec\x18\x04 \x01(\x01R\vDurationSec\"k\n" +
 	"\x11LogOutUserRequest\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x18\n" +
 	"\aVersion\x18\x02 \x01(\x05R\aVersion\x12\x14\n" +
@@ -937,7 +1001,7 @@ const file_auth_proto_rawDesc = "" +
 	"\x06Avatar\x18\x04 \x01(\tR\x06Avatar\"\x14\n" +
 	"\x12LogOutUserResponse\"1\n" +
 	"\x19ValidateAndGetUserRequest\x12\x14\n" +
-	"\x05Token\x18\x01 \x01(\tR\x05Token2\xc2\x05\n" +
+	"\x05Token\x18\x01 \x01(\tR\x05Token2\xc1\x05\n" +
 	"\x04Auth\x127\n" +
 	"\n" +
 	"SignupUser\x12\x13.auth.SignupRequest\x1a\x12.auth.AuthResponse\"\x00\x127\n" +
@@ -946,8 +1010,8 @@ const file_auth_proto_rawDesc = "" +
 	"\n" +
 	"LogOutUser\x12\x17.auth.LogOutUserRequest\x1a\x18.auth.LogOutUserResponse\"\x00\x125\n" +
 	"\aGetUser\x12\x14.auth.GetUserRequest\x1a\x12.auth.UserResponse\"\x00\x12C\n" +
-	"\x0eChangePassword\x12\x1b.auth.ChangePasswordRequest\x1a\x12.auth.AuthResponse\"\x00\x12?\n" +
-	"\fChangeAvatar\x12\x19.auth.ChangeAvatarRequest\x1a\x12.auth.AuthResponse\"\x00\x12K\n" +
+	"\x0eChangePassword\x12\x1b.auth.ChangePasswordRequest\x1a\x12.auth.AuthResponse\"\x00\x12>\n" +
+	"\tLoadDance\x12\x16.auth.LoadDanceRequest\x1a\x17.auth.LoadDanceResponse\"\x00\x12K\n" +
 	"\x12ValidateAndGetUser\x12\x1f.auth.ValidateAndGetUserRequest\x1a\x12.auth.UserResponse\"\x00\x12>\n" +
 	"\tEnable2fa\x12\x16.auth.Enable2faRequest\x1a\x17.auth.Enable2faResponse\"\x00\x12A\n" +
 	"\n" +
@@ -967,7 +1031,7 @@ func file_auth_proto_rawDescGZIP() []byte {
 	return file_auth_proto_rawDescData
 }
 
-var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
+var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_auth_proto_goTypes = []any{
 	(*SignupVKRequest)(nil),           // 0: auth.SignupVKRequest
 	(*Enable2FaRequest)(nil),          // 1: auth.Enable2faRequest
@@ -981,30 +1045,31 @@ var file_auth_proto_goTypes = []any{
 	(*AuthResponse)(nil),              // 9: auth.AuthResponse
 	(*GetUserRequest)(nil),            // 10: auth.GetUserRequest
 	(*ChangePasswordRequest)(nil),     // 11: auth.ChangePasswordRequest
-	(*ChangeAvatarRequest)(nil),       // 12: auth.ChangeAvatarRequest
-	(*LogOutUserRequest)(nil),         // 13: auth.LogOutUserRequest
-	(*LogOutUserResponse)(nil),        // 14: auth.LogOutUserResponse
-	(*ValidateAndGetUserRequest)(nil), // 15: auth.ValidateAndGetUserRequest
+	(*LoadDanceRequest)(nil),          // 12: auth.LoadDanceRequest
+	(*LoadDanceResponse)(nil),         // 13: auth.LoadDanceResponse
+	(*LogOutUserRequest)(nil),         // 14: auth.LogOutUserRequest
+	(*LogOutUserResponse)(nil),        // 15: auth.LogOutUserResponse
+	(*ValidateAndGetUserRequest)(nil), // 16: auth.ValidateAndGetUserRequest
 }
 var file_auth_proto_depIdxs = []int32{
 	6,  // 0: auth.AuthResponse.User:type_name -> auth.UserResponse
 	7,  // 1: auth.Auth.SignupUser:input_type -> auth.SignupRequest
 	8,  // 2: auth.Auth.SignInUser:input_type -> auth.SignInRequest
-	13, // 3: auth.Auth.LogOutUser:input_type -> auth.LogOutUserRequest
+	14, // 3: auth.Auth.LogOutUser:input_type -> auth.LogOutUserRequest
 	10, // 4: auth.Auth.GetUser:input_type -> auth.GetUserRequest
 	11, // 5: auth.Auth.ChangePassword:input_type -> auth.ChangePasswordRequest
-	12, // 6: auth.Auth.ChangeAvatar:input_type -> auth.ChangeAvatarRequest
-	15, // 7: auth.Auth.ValidateAndGetUser:input_type -> auth.ValidateAndGetUserRequest
+	12, // 6: auth.Auth.LoadDance:input_type -> auth.LoadDanceRequest
+	16, // 7: auth.Auth.ValidateAndGetUser:input_type -> auth.ValidateAndGetUserRequest
 	1,  // 8: auth.Auth.Enable2fa:input_type -> auth.Enable2faRequest
 	3,  // 9: auth.Auth.Disable2fa:input_type -> auth.Disable2faRequest
 	0,  // 10: auth.Auth.SignUpUserVK:input_type -> auth.SignupVKRequest
 	0,  // 11: auth.Auth.SignInUserVK:input_type -> auth.SignupVKRequest
 	9,  // 12: auth.Auth.SignupUser:output_type -> auth.AuthResponse
 	9,  // 13: auth.Auth.SignInUser:output_type -> auth.AuthResponse
-	14, // 14: auth.Auth.LogOutUser:output_type -> auth.LogOutUserResponse
+	15, // 14: auth.Auth.LogOutUser:output_type -> auth.LogOutUserResponse
 	6,  // 15: auth.Auth.GetUser:output_type -> auth.UserResponse
 	9,  // 16: auth.Auth.ChangePassword:output_type -> auth.AuthResponse
-	9,  // 17: auth.Auth.ChangeAvatar:output_type -> auth.AuthResponse
+	13, // 17: auth.Auth.LoadDance:output_type -> auth.LoadDanceResponse
 	6,  // 18: auth.Auth.ValidateAndGetUser:output_type -> auth.UserResponse
 	2,  // 19: auth.Auth.Enable2fa:output_type -> auth.Enable2faResponse
 	4,  // 20: auth.Auth.Disable2fa:output_type -> auth.Disable2faResponse
@@ -1030,7 +1095,7 @@ func file_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_proto_rawDesc), len(file_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   16,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

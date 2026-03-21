@@ -14,6 +14,7 @@ type UsersUsecase interface {
 	GetUser(ctx context.Context, id uuid.UUID) (models.User, error)
 	ValidateAndGetUser(ctx context.Context, token string) (models.User, error)
 	ChangePassword(ctx context.Context, id uuid.UUID, oldPassword string, newPassword string) (models.User, string, error)
+	UploadDance(ctx context.Context, buffer []byte, fileFormat string) (resultKey string, numFrames int, numSegments int, durationSec float64, err error)
 }
 
 type UsersRepo interface {

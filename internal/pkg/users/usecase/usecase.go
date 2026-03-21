@@ -166,7 +166,7 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, id uuid.UUID, oldPass
 	return neededUser, token, nil
 }
 
-func (uc *UserUsecase) UploadDance(ctx context.Context, id uuid.UUID, buffer []byte, fileFormat string) (string, error) {
+func (uc *UserUsecase) UploadDance(ctx context.Context, buffer []byte, fileFormat string) (resultKey string, numFrames int, numSegments int, durationSec float64, err error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
 	var danceExtension string
@@ -177,14 +177,14 @@ func (uc *UserUsecase) UploadDance(ctx context.Context, id uuid.UUID, buffer []b
 		danceExtension = ".mov"
 	default:
 		logger.Error("invalid format of file")
-		return "", users.ErrorBadRequest
+		return "", 0, 0, 0.0, users.ErrorBadRequest
 	}
 
 	dancePath, err := uc.storageRepo.UploadDance(ctx, buffer, fileFormat, danceExtension)
 	if err != nil {
 		logger.Error("failed to upload avatar", "error", err)
-		return "", users.ErrorInternalServerError
+		return "", 0, 0, 0.0, users.ErrorInternalServerError
 	}
 
-	return dancePath, nil
+	return dancePath, 0, 0, 0.0, nil
 }

@@ -36,7 +36,7 @@ func (r *S3Repository) UploadDance(ctx context.Context, buffer []byte, fileForma
 
 	picID := uuid.NewV4().String()
 
-	danceKey := filepath.Join("static", "dances", picID+danceExtension)
+	danceKey := filepath.Join("videos", picID+danceExtension)
 
 	_, err := r.client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(r.bucket),

@@ -191,3 +191,24 @@ func (g GrpcAuthHandler) ChangePassword(ctx context.Context, in *gen.ChangePassw
 		CSRFToken: csrfToken,
 	}, err
 }
+
+func (g GrpcAuthHandler) LoadDance(ctx context.Context, in *gen.LoadDanceRequest) (*gen.LoadDanceResponse, error) {
+	resultKey, numFrames, numSegments, durationSec, err := g.uuc.UploadDance(ctx, in.Dance, in.FileFormat)
+	if err != nil {
+		switch err {
+		case users.ErrorBadRequest:
+			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+		case users.ErrorNotFound:
+			return nil, status.Errorf(codes.NotFound, "%v", err)
+		default:
+			return nil, status.Errorf(codes.Internal, "%v", err)
+		}
+	}
+
+	return &gen.LoadDanceResponse{
+		ResultKey:   resultKey,
+		NumFrames:   int32(numFrames),
+		NumSegments: int32(numSegments),
+		DurationSec: durationSec,
+	}, err
+}

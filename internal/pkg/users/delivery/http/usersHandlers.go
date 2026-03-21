@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -254,6 +255,98 @@ func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("X-CSRF-Token", user.CSRFToken)
+	helpers.WriteJSON(w, response)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// ChangeAvatar godoc
+// @Summary LoadDance
+// @Tags users
+// @Accept multipart/form-data
+// @Produce json
+// @Param avatar formData file true "Dance video file (required, max 50MB, formats: mp4, mov)"
+// @Success 200 {object} models.LoadDanceResponse
+// @Failure 400
+// @Failure 401
+// @Failure 413
+// @Failure 500
+// @Router /users/dance [put]
+func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+	const maxRequestBodySize = 60 * 1024 * 1024
+	limitedReader := http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+	defer func() {
+		if limitedReader.Close() != nil {
+			_ = limitedReader.Close()
+
+		}
+	}()
+	newReq := *r
+	newReq.Body = limitedReader
+
+	err := newReq.ParseMultipartForm(maxRequestBodySize)
+	if err != nil {
+		if errors.As(err, new(*http.MaxBytesError)) {
+			log.LogHandlerError(logger, errors.New("file is too large"), http.StatusRequestEntityTooLarge)
+			helpers.WriteError(w, http.StatusRequestEntityTooLarge)
+			return
+		}
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+	defer func() {
+		if newReq.MultipartForm != nil {
+			_ = newReq.MultipartForm.RemoveAll()
+		}
+	}()
+
+	file, _, err := newReq.FormFile("dance")
+	if err != nil {
+		log.LogHandlerError(logger, errors.New("failed to read file"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+	defer func() {
+		if file.Close() != nil {
+			_ = file.Close()
+
+		}
+	}()
+
+	buffer, err := io.ReadAll(file)
+	if err != nil {
+		log.LogHandlerError(logger, errors.New("failed to read file"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	fileFormat := http.DetectContentType(buffer)
+
+	danceResult, err := u.client.LoadDance(r.Context(), &gen.LoadDanceRequest{
+		Dance:      buffer,
+		FileFormat: fileFormat})
+
+	if err != nil {
+		st, _ := status.FromError(err)
+		switch st.Code() {
+		case codes.InvalidArgument:
+			helpers.WriteError(w, http.StatusBadRequest)
+		case codes.NotFound:
+			helpers.WriteError(w, http.StatusNotFound)
+		default:
+			helpers.WriteError(w, http.StatusInternalServerError)
+		}
+		return
+	}
+
+	response := models.LoadDanceResponse{
+		ResultKey:   danceResult.ResultKey,
+		NumFrames:   int(danceResult.NumFrames),
+		NumSegments: int(danceResult.NumSegments),
+		DurationSec: danceResult.DurationSec,
+	}
+
 	helpers.WriteJSON(w, response)
 	log.LogHandlerInfo(logger, "success", http.StatusOK)
 }

@@ -24,7 +24,7 @@ const (
 	Auth_LogOutUser_FullMethodName         = "/auth.Auth/LogOutUser"
 	Auth_GetUser_FullMethodName            = "/auth.Auth/GetUser"
 	Auth_ChangePassword_FullMethodName     = "/auth.Auth/ChangePassword"
-	Auth_ChangeAvatar_FullMethodName       = "/auth.Auth/ChangeAvatar"
+	Auth_LoadDance_FullMethodName          = "/auth.Auth/LoadDance"
 	Auth_ValidateAndGetUser_FullMethodName = "/auth.Auth/ValidateAndGetUser"
 	Auth_Enable2Fa_FullMethodName          = "/auth.Auth/Enable2fa"
 	Auth_Disable2Fa_FullMethodName         = "/auth.Auth/Disable2fa"
@@ -41,7 +41,7 @@ type AuthClient interface {
 	LogOutUser(ctx context.Context, in *LogOutUserRequest, opts ...grpc.CallOption) (*LogOutUserResponse, error)
 	GetUser(ctx context.Context, in *GetUserRequest, opts ...grpc.CallOption) (*UserResponse, error)
 	ChangePassword(ctx context.Context, in *ChangePasswordRequest, opts ...grpc.CallOption) (*AuthResponse, error)
-	ChangeAvatar(ctx context.Context, in *ChangeAvatarRequest, opts ...grpc.CallOption) (*AuthResponse, error)
+	LoadDance(ctx context.Context, in *LoadDanceRequest, opts ...grpc.CallOption) (*LoadDanceResponse, error)
 	ValidateAndGetUser(ctx context.Context, in *ValidateAndGetUserRequest, opts ...grpc.CallOption) (*UserResponse, error)
 	Enable2Fa(ctx context.Context, in *Enable2FaRequest, opts ...grpc.CallOption) (*Enable2FaResponse, error)
 	Disable2Fa(ctx context.Context, in *Disable2FaRequest, opts ...grpc.CallOption) (*Disable2FaResponse, error)
@@ -107,10 +107,10 @@ func (c *authClient) ChangePassword(ctx context.Context, in *ChangePasswordReque
 	return out, nil
 }
 
-func (c *authClient) ChangeAvatar(ctx context.Context, in *ChangeAvatarRequest, opts ...grpc.CallOption) (*AuthResponse, error) {
+func (c *authClient) LoadDance(ctx context.Context, in *LoadDanceRequest, opts ...grpc.CallOption) (*LoadDanceResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(AuthResponse)
-	err := c.cc.Invoke(ctx, Auth_ChangeAvatar_FullMethodName, in, out, cOpts...)
+	out := new(LoadDanceResponse)
+	err := c.cc.Invoke(ctx, Auth_LoadDance_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ type AuthServer interface {
 	LogOutUser(context.Context, *LogOutUserRequest) (*LogOutUserResponse, error)
 	GetUser(context.Context, *GetUserRequest) (*UserResponse, error)
 	ChangePassword(context.Context, *ChangePasswordRequest) (*AuthResponse, error)
-	ChangeAvatar(context.Context, *ChangeAvatarRequest) (*AuthResponse, error)
+	LoadDance(context.Context, *LoadDanceRequest) (*LoadDanceResponse, error)
 	ValidateAndGetUser(context.Context, *ValidateAndGetUserRequest) (*UserResponse, error)
 	Enable2Fa(context.Context, *Enable2FaRequest) (*Enable2FaResponse, error)
 	Disable2Fa(context.Context, *Disable2FaRequest) (*Disable2FaResponse, error)
@@ -207,8 +207,8 @@ func (UnimplementedAuthServer) GetUser(context.Context, *GetUserRequest) (*UserR
 func (UnimplementedAuthServer) ChangePassword(context.Context, *ChangePasswordRequest) (*AuthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ChangePassword not implemented")
 }
-func (UnimplementedAuthServer) ChangeAvatar(context.Context, *ChangeAvatarRequest) (*AuthResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method ChangeAvatar not implemented")
+func (UnimplementedAuthServer) LoadDance(context.Context, *LoadDanceRequest) (*LoadDanceResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method LoadDance not implemented")
 }
 func (UnimplementedAuthServer) ValidateAndGetUser(context.Context, *ValidateAndGetUserRequest) (*UserResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ValidateAndGetUser not implemented")
@@ -336,20 +336,20 @@ func _Auth_ChangePassword_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Auth_ChangeAvatar_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ChangeAvatarRequest)
+func _Auth_LoadDance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LoadDanceRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(AuthServer).ChangeAvatar(ctx, in)
+		return srv.(AuthServer).LoadDance(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: Auth_ChangeAvatar_FullMethodName,
+		FullMethod: Auth_LoadDance_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(AuthServer).ChangeAvatar(ctx, req.(*ChangeAvatarRequest))
+		return srv.(AuthServer).LoadDance(ctx, req.(*LoadDanceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -472,8 +472,8 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Auth_ChangePassword_Handler,
 		},
 		{
-			MethodName: "ChangeAvatar",
-			Handler:    _Auth_ChangeAvatar_Handler,
+			MethodName: "LoadDance",
+			Handler:    _Auth_LoadDance_Handler,
 		},
 		{
 			MethodName: "ValidateAndGetUser",
