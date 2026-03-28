@@ -1,6 +1,6 @@
-// @title           Kinopoisk API
+// @title           DDDance API
 // @version         1.0
-// @description     API для авторизации пользователей и получения фильмов/жанров/актеров.
+// @description     API для авторизации пользователей и получения разбора танца.
 // @host            localhost:5458
 // @BasePath        /api
 package main
@@ -25,6 +25,7 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"google.golang.org/grpc"
 
 	"github.com/gorilla/mux"
@@ -84,6 +85,7 @@ func main() {
 	ddLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	mainRouter := mux.NewRouter()
+	mainRouter.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
 	apiRouter := mainRouter.PathPrefix("/api").Subrouter()
 	apiRouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

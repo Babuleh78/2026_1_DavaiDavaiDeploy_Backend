@@ -1,0 +1,255 @@
+basePath: /api
+definitions:
+  models.ChangePasswordInput:
+    properties:
+      new_password:
+        type: string
+      old_password:
+        type: string
+    required:
+    - new_password
+    - old_password
+    type: object
+  models.LoadDanceResponse:
+    properties:
+      duration_sec:
+        type: number
+      num_frames:
+        type: integer
+      num_segments:
+        type: integer
+      result_key:
+        type: string
+    required:
+    - duration_sec
+    - num_frames
+    - num_segments
+    - result_key
+    type: object
+  models.SignInInput:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+      user_code:
+        type: string
+    required:
+    - login
+    - password
+    type: object
+  models.SignUpInput:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    required:
+    - login
+    - password
+    type: object
+  models.User:
+    properties:
+      avatar:
+        type: string
+      created_at:
+        type: string
+      has_2fa:
+        type: boolean
+      id:
+        type: string
+      is_foreign:
+        type: boolean
+      login:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+    required:
+    - avatar
+    - has_2fa
+    - id
+    - is_foreign
+    - login
+    - version
+    type: object
+host: localhost:5458
+info:
+  contact: {}
+  description: API для авторизации пользователей и получения разбора танца.
+  title: DDDance API
+  version: "1.0"
+paths:
+  /auth/check:
+    get:
+      description: Verify if user is authenticated and return user data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Check authentication status
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Clear authentication cookie and log out user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: User logout
+      tags:
+      - auth
+  /auth/signin:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user
+      parameters:
+      - description: User data
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.SignInInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: User login
+      tags:
+      - auth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account
+      parameters:
+      - description: User registration data
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.SignUpInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+      summary: User registration
+      tags:
+      - auth
+  /users/{id}:
+    get:
+      parameters:
+      - description: Genre ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get user by ID
+      tags:
+      - users
+  /users/dance:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: 'Dance video file (required, max 50MB, formats: mp4, mov)'
+        in: formData
+        name: dance
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LoadDanceResponse'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "413":
+          description: Request Entity Too Large
+        "500":
+          description: Internal Server Error
+      summary: Load Dance
+      tags:
+      - users
+  /users/password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Password data (old_password and new_password are required)
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.ChangePasswordInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Change user password
+      tags:
+      - users
+swagger: "2.0"

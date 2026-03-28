@@ -134,13 +134,6 @@ func main() {
 
 	r := mux.NewRouter().PathPrefix("").Subrouter()
 	http.Handle("/", r)
-	httpSrv := http.Server{Handler: r, Addr: ":5460"}
-	//запуск мониторинга
-	go func() {
-		if err := httpSrv.ListenAndServe(); err != nil {
-			fmt.Println(err)
-		}
-	}()
 
 	go func() {
 		listener, err := net.Listen("tcp", fmt.Sprintf(":%d", 5459))

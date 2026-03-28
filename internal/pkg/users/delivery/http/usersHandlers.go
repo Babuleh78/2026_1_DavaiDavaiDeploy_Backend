@@ -259,18 +259,18 @@ func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
 
-// ChangeAvatar godoc
-// @Summary LoadDance
+// LoadDance godoc
+// @Summary Load Dance
 // @Tags users
 // @Accept multipart/form-data
 // @Produce json
-// @Param avatar formData file true "Dance video file (required, max 50MB, formats: mp4, mov)"
+// @Param dance formData file true "Dance video file (required, max 50MB, formats: mp4, mov)"
 // @Success 200 {object} models.LoadDanceResponse
 // @Failure 400
 // @Failure 401
 // @Failure 413
 // @Failure 500
-// @Router /users/dance [put]
+// @Router /users/dance [post]
 func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 
