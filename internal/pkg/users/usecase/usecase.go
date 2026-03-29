@@ -169,7 +169,7 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, id uuid.UUID, oldPass
 	return neededUser, token, nil
 }
 
-func (uc *UserUsecase) UploadDance(ctx context.Context, buffer []byte, fileFormat string) (resultKey string, numFrames int, numSegments int, durationSec float64, err error) {
+func (uc *UserUsecase) UploadDance(ctx context.Context, buffer []byte, fileFormat string) (resultKey string, segmentsKey string, numFrames int, numSegments int, durationSec float64, err error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
 	var danceExtension string
@@ -180,13 +180,13 @@ func (uc *UserUsecase) UploadDance(ctx context.Context, buffer []byte, fileForma
 		danceExtension = ".mov"
 	default:
 		logger.Error("invalid format of file")
-		return "", 0, 0, 0.0, users.ErrorBadRequest
+		return "", "", 0, 0, 0.0, users.ErrorBadRequest
 	}
 
 	dancePath, err := uc.storageRepo.UploadDance(ctx, buffer, fileFormat, danceExtension)
 	if err != nil {
 		logger.Error("failed to upload dance", "error", err)
-		return "", 0, 0, 0.0, users.ErrorInternalServerError
+		return "", "", 0, 0, 0.0, users.ErrorInternalServerError
 	}
 	logger.Info("video uploaded to S3", "path", dancePath)
 
@@ -200,37 +200,38 @@ func (uc *UserUsecase) UploadDance(ctx context.Context, buffer []byte, fileForma
 	jsonBody, err := json.Marshal(requestBody)
 	if err != nil {
 		logger.Error("failed to marshal request", "error", err)
-		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
 	}
 
 	logger.Info("sending request to processing service", "url", processingURL)
 
 	client := &http.Client{
-		Timeout: 60 * time.Second,
+		Timeout: 300 * time.Second,
 	}
 
 	resp, err := client.Post(processingURL, "application/json", bytes.NewBuffer(jsonBody))
 	if err != nil {
 		logger.Error("failed to call processing service", "error", err)
-		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		logger.Error("failed to read processing service response", "error", err)
-		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		logger.Error("processing service returned error",
 			"status", resp.StatusCode,
 			"body", string(body))
-		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
 	}
 
 	var processingResponse struct {
 		ResultKey   string  `json:"result_key"`
+		SegmentsKey string  `json:"segments_key"`
 		NumFrames   int     `json:"num_frames"`
 		NumSegments int     `json:"num_segments"`
 		DurationSec float64 `json:"duration_sec"`
@@ -238,16 +239,18 @@ func (uc *UserUsecase) UploadDance(ctx context.Context, buffer []byte, fileForma
 
 	if err := json.Unmarshal(body, &processingResponse); err != nil {
 		logger.Error("failed to parse processing service response", "error", err)
-		return dancePath, 0, 0, 0.0, users.ErrorInternalServerError
+		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
 	}
 
 	logger.Info("processing completed successfully",
 		"result_key", processingResponse.ResultKey,
+		"segments_key", processingResponse.SegmentsKey,
 		"num_frames", processingResponse.NumFrames,
 		"num_segments", processingResponse.NumSegments,
 		"duration_sec", processingResponse.DurationSec)
 
 	return processingResponse.ResultKey,
+		processingResponse.SegmentsKey,
 		processingResponse.NumFrames,
 		processingResponse.NumSegments,
 		processingResponse.DurationSec,

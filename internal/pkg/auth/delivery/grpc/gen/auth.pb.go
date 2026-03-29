@@ -724,9 +724,10 @@ func (x *LoadDanceRequest) GetFileFormat() string {
 type LoadDanceResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ResultKey     string                 `protobuf:"bytes,1,opt,name=ResultKey,proto3" json:"ResultKey,omitempty"`
-	NumFrames     int32                  `protobuf:"varint,2,opt,name=NumFrames,proto3" json:"NumFrames,omitempty"`
-	NumSegments   int32                  `protobuf:"varint,3,opt,name=NumSegments,proto3" json:"NumSegments,omitempty"`
-	DurationSec   float64                `protobuf:"fixed64,4,opt,name=DurationSec,proto3" json:"DurationSec,omitempty"`
+	SegmentsKey   string                 `protobuf:"bytes,2,opt,name=SegmentsKey,proto3" json:"SegmentsKey,omitempty"`
+	NumFrames     int32                  `protobuf:"varint,3,opt,name=NumFrames,proto3" json:"NumFrames,omitempty"`
+	NumSegments   int32                  `protobuf:"varint,4,opt,name=NumSegments,proto3" json:"NumSegments,omitempty"`
+	DurationSec   float64                `protobuf:"fixed64,5,opt,name=DurationSec,proto3" json:"DurationSec,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -764,6 +765,13 @@ func (*LoadDanceResponse) Descriptor() ([]byte, []int) {
 func (x *LoadDanceResponse) GetResultKey() string {
 	if x != nil {
 		return x.ResultKey
+	}
+	return ""
+}
+
+func (x *LoadDanceResponse) GetSegmentsKey() string {
+	if x != nil {
+		return x.SegmentsKey
 	}
 	return ""
 }
@@ -988,12 +996,13 @@ const file_auth_proto_rawDesc = "" +
 	"\x05Dance\x18\x01 \x01(\fR\x05Dance\x12\x1e\n" +
 	"\n" +
 	"FileFormat\x18\x02 \x01(\tR\n" +
-	"FileFormat\"\x93\x01\n" +
+	"FileFormat\"\xb5\x01\n" +
 	"\x11LoadDanceResponse\x12\x1c\n" +
-	"\tResultKey\x18\x01 \x01(\tR\tResultKey\x12\x1c\n" +
-	"\tNumFrames\x18\x02 \x01(\x05R\tNumFrames\x12 \n" +
-	"\vNumSegments\x18\x03 \x01(\x05R\vNumSegments\x12 \n" +
-	"\vDurationSec\x18\x04 \x01(\x01R\vDurationSec\"k\n" +
+	"\tResultKey\x18\x01 \x01(\tR\tResultKey\x12 \n" +
+	"\vSegmentsKey\x18\x02 \x01(\tR\vSegmentsKey\x12\x1c\n" +
+	"\tNumFrames\x18\x03 \x01(\x05R\tNumFrames\x12 \n" +
+	"\vNumSegments\x18\x04 \x01(\x05R\vNumSegments\x12 \n" +
+	"\vDurationSec\x18\x05 \x01(\x01R\vDurationSec\"k\n" +
 	"\x11LogOutUserRequest\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x18\n" +
 	"\aVersion\x18\x02 \x01(\x05R\aVersion\x12\x14\n" +

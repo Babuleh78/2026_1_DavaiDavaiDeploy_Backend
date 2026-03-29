@@ -87,9 +87,10 @@ message LoadDanceRequest {
 
 message LoadDanceResponse {
   string ResultKey = 1;
-  int32 NumFrames = 2;
-  int32 NumSegments = 3;
-  double DurationSec = 4;
+  string SegmentsKey = 2;
+  int32 NumFrames = 3;
+  int32 NumSegments = 4;
+  double DurationSec = 5;
 }
 
 message LogOutUserRequest{

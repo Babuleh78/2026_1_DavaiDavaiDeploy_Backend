@@ -187,9 +187,6 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request"
                     },
-                    "401": {
-                        "description": "Unauthorized"
-                    },
                     "413": {
                         "description": "Request Entity Too Large"
                     },
@@ -301,7 +298,8 @@ const docTemplate = `{
                 "duration_sec",
                 "num_frames",
                 "num_segments",
-                "result_key"
+                "result_key",
+                "segments_key"
             ],
             "properties": {
                 "duration_sec": {
@@ -314,6 +312,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "result_key": {
+                    "type": "string"
+                },
+                "segments_key": {
                     "type": "string"
                 }
             }

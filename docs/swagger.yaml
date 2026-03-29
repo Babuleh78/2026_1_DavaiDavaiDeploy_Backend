@@ -20,11 +20,14 @@ definitions:
         type: integer
       result_key:
         type: string
+      segments_key:
+        type: string
     required:
     - duration_sec
     - num_frames
     - num_segments
     - result_key
+    - segments_key
     type: object
   models.SignInInput:
     properties:
@@ -216,8 +219,6 @@ paths:
             $ref: '#/definitions/models.LoadDanceResponse'
         "400":
           description: Bad Request
-        "401":
-          description: Unauthorized
         "413":
           description: Request Entity Too Large
         "500":

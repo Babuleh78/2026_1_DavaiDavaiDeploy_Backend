@@ -267,7 +267,6 @@ func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 // @Param dance formData file true "Dance video file (required, max 50MB, formats: mp4, mov)"
 // @Success 200 {object} models.LoadDanceResponse
 // @Failure 400
-// @Failure 401
 // @Failure 413
 // @Failure 500
 // @Router /users/dance [post]
@@ -342,6 +341,7 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 
 	response := models.LoadDanceResponse{
 		ResultKey:   danceResult.ResultKey,
+		SegmentsKey: danceResult.SegmentsKey,
 		NumFrames:   int(danceResult.NumFrames),
 		NumSegments: int(danceResult.NumSegments),
 		DurationSec: danceResult.DurationSec,
