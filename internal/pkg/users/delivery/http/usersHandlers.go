@@ -333,7 +333,6 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ✅ Правильное маппирование всех полей из gRPC-ответа
 	response := models.LoadDanceResponse{
 		DanceID:             danceResult.DanceID,
 		GlbKeys:             danceResult.GlbKeys,
@@ -344,7 +343,6 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
 	}
 
-	// Опционально: санитизация перед отправкой
 	response.Sanitize()
 
 	helpers.WriteJSON(w, response)
