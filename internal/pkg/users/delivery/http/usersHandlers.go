@@ -276,10 +276,7 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 	const maxRequestBodySize = 60 * 1024 * 1024
 	limitedReader := http.MaxBytesReader(w, r.Body, maxRequestBodySize)
 	defer func() {
-		if limitedReader.Close() != nil {
-			_ = limitedReader.Close()
-
-		}
+		_ = limitedReader.Close()
 	}()
 	newReq := *r
 	newReq.Body = limitedReader
@@ -307,10 +304,7 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() {
-		if file.Close() != nil {
-			_ = file.Close()
-
-		}
+		_ = file.Close()
 	}()
 
 	buffer, err := io.ReadAll(file)
@@ -324,8 +318,8 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 
 	danceResult, err := u.client.LoadDance(r.Context(), &gen.LoadDanceRequest{
 		Dance:      buffer,
-		FileFormat: fileFormat})
-
+		FileFormat: fileFormat,
+	})
 	if err != nil {
 		st, _ := status.FromError(err)
 		switch st.Code() {
@@ -339,13 +333,19 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// ✅ Правильное маппирование всех полей из gRPC-ответа
 	response := models.LoadDanceResponse{
-		ResultKey:   danceResult.ResultKey,
-		SegmentsKey: danceResult.SegmentsKey,
-		NumFrames:   int(danceResult.NumFrames),
-		NumSegments: int(danceResult.NumSegments),
-		DurationSec: danceResult.DurationSec,
+		DanceID:             danceResult.DanceID,
+		GlbKeys:             danceResult.GlbKeys,
+		SegmentsKey:         danceResult.SegmentsKey,
+		NumFrames:           int(danceResult.NumFrames),
+		NumSegments:         int(danceResult.NumSegments),
+		DurationSec:         danceResult.DurationSec,
+		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
 	}
+
+	// Опционально: санитизация перед отправкой
+	response.Sanitize()
 
 	helpers.WriteJSON(w, response)
 	log.LogHandlerInfo(logger, "success", http.StatusOK)

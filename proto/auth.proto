@@ -87,24 +87,13 @@ message LoadDanceRequest {
 
 message LoadDanceResponse {
   string DanceID = 1;
-  string SegmentsKey =2;
-  string GlbKeys = 3;
-  int NumFrames = 4;
-  int NumSegments = 5;
-  int NumSegmentsRendered = 6;
-  int DurationSec = 7;
+  string SegmentsKey = 2;
+  repeated string GlbKeys = 3;
+  int32 NumFrames = 4;
+  int32 NumSegments = 5;
+  int32 NumSegmentsRendered = 6;
+  double DurationSec = 7;
 }
-
-
-return &users.UploadDanceResult{
-        DanceID:             result.DanceID,
-        SegmentsKey:         result.SegmentsKey,
-        GlbKeys:             result.GlbKeys,
-        NumFrames:           result.NumFrames,
-        NumSegments:         result.NumSegments,
-        NumSegmentsRendered: result.NumSegmentsRendered,
-        DurationSec:         result.DurationSec,
-    }, nil
 
 message LogOutUserRequest{
   string ID = 1;       
