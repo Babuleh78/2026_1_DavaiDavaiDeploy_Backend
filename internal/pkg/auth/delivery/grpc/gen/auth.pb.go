@@ -722,14 +722,16 @@ func (x *LoadDanceRequest) GetFileFormat() string {
 }
 
 type LoadDanceResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ResultKey     string                 `protobuf:"bytes,1,opt,name=ResultKey,proto3" json:"ResultKey,omitempty"`
-	SegmentsKey   string                 `protobuf:"bytes,2,opt,name=SegmentsKey,proto3" json:"SegmentsKey,omitempty"`
-	NumFrames     int32                  `protobuf:"varint,3,opt,name=NumFrames,proto3" json:"NumFrames,omitempty"`
-	NumSegments   int32                  `protobuf:"varint,4,opt,name=NumSegments,proto3" json:"NumSegments,omitempty"`
-	DurationSec   float64                `protobuf:"fixed64,5,opt,name=DurationSec,proto3" json:"DurationSec,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	DanceID             string                 `protobuf:"bytes,1,opt,name=DanceID,proto3" json:"DanceID,omitempty"`
+	SegmentsKey         string                 `protobuf:"bytes,2,opt,name=SegmentsKey,proto3" json:"SegmentsKey,omitempty"`
+	GlbKeys             string                 `protobuf:"bytes,3,opt,name=GlbKeys,proto3" json:"GlbKeys,omitempty"`
+	NumFrames           int32                  `protobuf:"varint,4,opt,name=NumFrames,proto3" json:"NumFrames,omitempty"`
+	NumSegments         int32                  `protobuf:"varint,5,opt,name=NumSegments,proto3" json:"NumSegments,omitempty"`
+	NumSegmentsRendered int32                  `protobuf:"varint,6,opt,name=NumSegmentsRendered,proto3" json:"NumSegmentsRendered,omitempty"`
+	DurationSec         float64                `protobuf:"fixed64,7,opt,name=DurationSec,proto3" json:"DurationSec,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *LoadDanceResponse) Reset() {
@@ -762,9 +764,9 @@ func (*LoadDanceResponse) Descriptor() ([]byte, []int) {
 	return file_auth_proto_rawDescGZIP(), []int{13}
 }
 
-func (x *LoadDanceResponse) GetResultKey() string {
+func (x *LoadDanceResponse) GetDanceID() string {
 	if x != nil {
-		return x.ResultKey
+		return x.DanceID
 	}
 	return ""
 }
@@ -772,6 +774,13 @@ func (x *LoadDanceResponse) GetResultKey() string {
 func (x *LoadDanceResponse) GetSegmentsKey() string {
 	if x != nil {
 		return x.SegmentsKey
+	}
+	return ""
+}
+
+func (x *LoadDanceResponse) GetGlbKeys() string {
+	if x != nil {
+		return x.GlbKeys
 	}
 	return ""
 }
@@ -786,6 +795,13 @@ func (x *LoadDanceResponse) GetNumFrames() int32 {
 func (x *LoadDanceResponse) GetNumSegments() int32 {
 	if x != nil {
 		return x.NumSegments
+	}
+	return 0
+}
+
+func (x *LoadDanceResponse) GetNumSegmentsRendered() int32 {
+	if x != nil {
+		return x.NumSegmentsRendered
 	}
 	return 0
 }
@@ -996,13 +1012,15 @@ const file_auth_proto_rawDesc = "" +
 	"\x05Dance\x18\x01 \x01(\fR\x05Dance\x12\x1e\n" +
 	"\n" +
 	"FileFormat\x18\x02 \x01(\tR\n" +
-	"FileFormat\"\xb5\x01\n" +
-	"\x11LoadDanceResponse\x12\x1c\n" +
-	"\tResultKey\x18\x01 \x01(\tR\tResultKey\x12 \n" +
-	"\vSegmentsKey\x18\x02 \x01(\tR\vSegmentsKey\x12\x1c\n" +
-	"\tNumFrames\x18\x03 \x01(\x05R\tNumFrames\x12 \n" +
-	"\vNumSegments\x18\x04 \x01(\x05R\vNumSegments\x12 \n" +
-	"\vDurationSec\x18\x05 \x01(\x01R\vDurationSec\"k\n" +
+	"FileFormat\"\xfd\x01\n" +
+	"\x11LoadDanceResponse\x12\x18\n" +
+	"\aDanceID\x18\x01 \x01(\tR\aDanceID\x12 \n" +
+	"\vSegmentsKey\x18\x02 \x01(\tR\vSegmentsKey\x12\x18\n" +
+	"\aGlbKeys\x18\x03 \x01(\tR\aGlbKeys\x12\x1c\n" +
+	"\tNumFrames\x18\x04 \x01(\x05R\tNumFrames\x12 \n" +
+	"\vNumSegments\x18\x05 \x01(\x05R\vNumSegments\x120\n" +
+	"\x13NumSegmentsRendered\x18\x06 \x01(\x05R\x13NumSegmentsRendered\x12 \n" +
+	"\vDurationSec\x18\a \x01(\x01R\vDurationSec\"k\n" +
 	"\x11LogOutUserRequest\x12\x0e\n" +
 	"\x02ID\x18\x01 \x01(\tR\x02ID\x12\x18\n" +
 	"\aVersion\x18\x02 \x01(\x05R\aVersion\x12\x14\n" +

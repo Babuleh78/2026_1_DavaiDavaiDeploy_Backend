@@ -9,11 +9,11 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"time"
+	
 
 	jwt "github.com/golang-jwt/jwt/v5"
 	uuid "github.com/satori/go.uuid"
@@ -43,6 +43,7 @@ type UserUsecase struct {
 	userRepo    users.UsersRepo
 	storageRepo users.StorageRepo
 }
+
 
 func NewUserUsecase(userRepo users.UsersRepo, storageRepo users.StorageRepo) *UserUsecase {
 	return &UserUsecase{
@@ -169,90 +170,131 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, id uuid.UUID, oldPass
 	return neededUser, token, nil
 }
 
-func (uc *UserUsecase) UploadDance(ctx context.Context, buffer []byte, fileFormat string) (resultKey string, segmentsKey string, numFrames int, numSegments int, durationSec float64, err error) {
-	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
-	var danceExtension string
-	switch fileFormat {
-	case "video/mp4":
-		danceExtension = ".mp4"
-	case "video/quicktime":
-		danceExtension = ".mov"
-	default:
-		logger.Error("invalid format of file")
-		return "", "", 0, 0, 0.0, users.ErrorBadRequest
-	}
+type ProcessingResult struct {
+    DanceID             string   `json:"dance_id"`
+    SegmentsKey         string   `json:"segments_key"`
+    GlbKeys             []string `json:"glb_keys"`
+    NumFrames           int      `json:"num_frames"`
+    NumSegments         int      `json:"num_segments"`
+    NumSegmentsRendered int      `json:"num_segments_rendered"`
+    DurationSec         float64  `json:"duration_sec"`
+}
 
-	dancePath, err := uc.storageRepo.UploadDance(ctx, buffer, fileFormat, danceExtension)
-	if err != nil {
-		logger.Error("failed to upload dance", "error", err)
-		return "", "", 0, 0, 0.0, users.ErrorInternalServerError
-	}
-	logger.Info("video uploaded to S3", "path", dancePath)
+func (uc *UserUsecase) UploadDance(
+    ctx context.Context, 
+    buffer []byte, 
+    fileFormat string,
+) (*users.UploadDanceResult, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
-	processingURL := os.Getenv("ML_SERVICE_URL") + "/process"
+    var danceExtension string
+    switch fileFormat {
+    case "video/mp4":
+        danceExtension = ".mp4"
+    case "video/quicktime":
+        danceExtension = ".mov"
+    default:
+        logger.Error("invalid format of file")
+        return nil, users.ErrorBadRequest
+    }
 
-	requestBody := map[string]string{
-		"bucket":    os.Getenv("AWS_S3_BUCKET"),
-		"video_key": dancePath,
-	}
+    dancePath, err := uc.storageRepo.UploadDance(ctx, buffer, fileFormat, danceExtension)
+    if err != nil {
+        logger.Error("failed to upload dance", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
 
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		logger.Error("failed to marshal request", "error", err)
-		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
-	}
+    danceID := uuid.NewV4().String() 
+    logger.Info("video uploaded to S3", "path", dancePath, "dance_id", danceID)
 
-	logger.Info("sending request to processing service", "url", processingURL)
+    taskID, err := uc.enqueueProcessing(ctx, dancePath, danceID)
+    if err != nil {
+        logger.Error("failed to enqueue processing", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
 
-	client := &http.Client{
-		Timeout: 300 * time.Second,
-	}
+    result, err := uc.waitForProcessing(ctx, taskID, logger)
+    if err != nil {
+        logger.Error("processing failed", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
 
-	resp, err := client.Post(processingURL, "application/json", bytes.NewBuffer(jsonBody))
-	if err != nil {
-		logger.Error("failed to call processing service", "error", err)
-		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
-	}
-	defer resp.Body.Close()
+    if result == nil {
+        logger.Error("processing returned nil result")
+        return nil, users.ErrorInternalServerError
+    }
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		logger.Error("failed to read processing service response", "error", err)
-		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
-	}
+    return &users.UploadDanceResult{
+        DanceID:             result.DanceID,
+        SegmentsKey:         result.SegmentsKey,
+        GlbKeys:             result.GlbKeys,
+        NumFrames:           result.NumFrames,
+        NumSegments:         result.NumSegments,
+        NumSegmentsRendered: result.NumSegmentsRendered,
+        DurationSec:         result.DurationSec,
+    }, nil
+}
 
-	if resp.StatusCode != http.StatusOK {
-		logger.Error("processing service returned error",
-			"status", resp.StatusCode,
-			"body", string(body))
-		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
-	}
 
-	var processingResponse struct {
-		ResultKey   string  `json:"result_key"`
-		SegmentsKey string  `json:"segments_key"`
-		NumFrames   int     `json:"num_frames"`
-		NumSegments int     `json:"num_segments"`
-		DurationSec float64 `json:"duration_sec"`
-	}
+func (uc *UserUsecase) enqueueProcessing(ctx context.Context, videoKey, danceID string) (string, error) {
+	//Кстати обратите внимание, ML_SERVICE_URL=http://ml-service:8000/ml, теперь нужно /ml прописывать, так надо
+    processingURL := os.Getenv("ML_SERVICE_URL") + "/process"
+	// Только ключ и id, если непонятно, то с(пр)осите
+    requestBody := map[string]string{
+        "video_key": videoKey, 
+        "dance_id":  danceID,
+    }
 
-	if err := json.Unmarshal(body, &processingResponse); err != nil {
-		logger.Error("failed to parse processing service response", "error", err)
-		return dancePath, "", 0, 0, 0.0, users.ErrorInternalServerError
-	}
+    jsonBody, _ := json.Marshal(requestBody)
+	client := &http.Client{Timeout: 20 * time.Second}
 
-	logger.Info("processing completed successfully",
-		"result_key", processingResponse.ResultKey,
-		"segments_key", processingResponse.SegmentsKey,
-		"num_frames", processingResponse.NumFrames,
-		"num_segments", processingResponse.NumSegments,
-		"duration_sec", processingResponse.DurationSec)
+    resp, err := client.Post(processingURL, "application/json", bytes.NewBuffer(jsonBody))
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
 
-	return processingResponse.ResultKey,
-		processingResponse.SegmentsKey,
-		processingResponse.NumFrames,
-		processingResponse.NumSegments,
-		processingResponse.DurationSec,
-		nil
+    var response struct {
+        TaskID string `json:"task_id"`
+    }
+    json.NewDecoder(resp.Body).Decode(&response)
+    return response.TaskID, nil
+}
+
+
+func (uc *UserUsecase) waitForProcessing(ctx context.Context, taskID string, logger *slog.Logger) (*ProcessingResult, error) {
+    statusURL := os.Getenv("ML_SERVICE_URL") + "/status/" + taskID
+
+    // Таймаут всей операции — 10 минут
+    deadline := time.Now().Add(10 * time.Minute)
+    client := &http.Client{Timeout: 10 * time.Second}
+
+    for time.Now().Before(deadline) {
+        time.Sleep(5 * time.Second)
+
+        resp, err := client.Get(statusURL)
+        if err != nil {
+            logger.Warn("status check failed", "error", err)
+            continue
+        }
+
+        var status struct {
+            Status string           `json:"status"`
+            Result *ProcessingResult `json:"result,omitempty"`
+        }
+        json.NewDecoder(resp.Body).Decode(&status)
+        resp.Body.Close()
+
+        logger.Info("processing status", "status", status.Status)
+
+        switch status.Status {
+        case "done":
+            return status.Result, nil
+        case "failed":
+            return nil, fmt.Errorf("processing failed")
+        }
+    }
+
+    return nil, fmt.Errorf("processing timeout")
 }

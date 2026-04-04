@@ -8,14 +8,26 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
+// Зумеры придумали виртуальные классы
 type UsersUsecase interface {
 	GenerateToken(id uuid.UUID, login string, version int) (string, error)
 	ParseToken(token string) (*jwt.Token, error)
 	GetUser(ctx context.Context, id uuid.UUID) (models.User, error)
 	ValidateAndGetUser(ctx context.Context, token string) (models.User, error)
 	ChangePassword(ctx context.Context, id uuid.UUID, oldPassword string, newPassword string) (models.User, string, error)
-	UploadDance(ctx context.Context, buffer []byte, fileFormat string) (resultKey string, segmentsKey string, numFrames int, numSegments int, durationSec float64, err error)
+	UploadDance(ctx context.Context, buffer []byte, fileFormat string) (*UploadDanceResult, error)
 }
+
+type UploadDanceResult struct {
+    DanceID             string
+    SegmentsKey         string
+    GlbKeys             []string
+    NumFrames           int
+    NumSegments         int
+    NumSegmentsRendered int
+    DurationSec         float64
+}
+
 
 type UsersRepo interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (models.User, error)

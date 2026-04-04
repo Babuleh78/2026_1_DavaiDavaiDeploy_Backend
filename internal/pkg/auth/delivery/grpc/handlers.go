@@ -193,7 +193,7 @@ func (g GrpcAuthHandler) ChangePassword(ctx context.Context, in *gen.ChangePassw
 }
 
 func (g GrpcAuthHandler) LoadDance(ctx context.Context, in *gen.LoadDanceRequest) (*gen.LoadDanceResponse, error) {
-	resultKey, segmentsKey, numFrames, numSegments, durationSec, err := g.uuc.UploadDance(ctx, in.Dance, in.FileFormat)
+	result, err := g.uuc.UploadDance(ctx, in.Dance, in.FileFormat)
 	if err != nil {
 		switch err {
 		case users.ErrorBadRequest:
@@ -206,10 +206,13 @@ func (g GrpcAuthHandler) LoadDance(ctx context.Context, in *gen.LoadDanceRequest
 	}
 
 	return &gen.LoadDanceResponse{
-		ResultKey:   resultKey,
-		SegmentsKey: segmentsKey,
-		NumFrames:   int32(numFrames),
-		NumSegments: int32(numSegments),
-		DurationSec: durationSec,
+		DanceID:   result.DanceID,
+		GlbKeys:   result.GlbKeys,
+		NumSegmentsRendered: int32(result.NumSegmentsRendered),
+		SegmentsKey: result.SegmentsKey,
+		NumFrames:   int32(result.NumFrames),
+		NumSegments: int32(result.NumSegments),
+		DurationSec: result.DurationSec,
+
 	}, err
 }
