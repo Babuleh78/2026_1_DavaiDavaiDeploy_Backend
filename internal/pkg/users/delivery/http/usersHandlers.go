@@ -14,6 +14,9 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"os/exec"
+	"fmt"
+	"bytes"
 
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
@@ -314,11 +317,16 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fileFormat := http.DetectContentType(buffer)
+	buffer, err = convertToH264(buffer)
+	if err != nil {
+		log.LogHandlerError(logger, fmt.Errorf("failed to convert video: %w", err), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
 
 	danceResult, err := u.client.LoadDance(r.Context(), &gen.LoadDanceRequest{
 		Dance:      buffer,
-		FileFormat: fileFormat,
+		FileFormat: "video/mp4",
 	})
 	if err != nil {
 		st, _ := status.FromError(err)
@@ -335,6 +343,7 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 
 	response := models.LoadDanceResponse{
 		DanceID:             danceResult.DanceID,
+		FullGlbKey:          danceResult.FullGlbKey,
 		GlbKeys:             danceResult.GlbKeys,
 		SegmentsKey:         danceResult.SegmentsKey,
 		NumFrames:           int(danceResult.NumFrames),
@@ -347,4 +356,56 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 
 	helpers.WriteJSON(w, response)
 	log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+func convertToH264(input []byte) ([]byte, error) {
+	tmpDir := "/dddance-back/tmp"
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		tmpDir = "."
+	}
+
+	tmpIn, err := os.CreateTemp(tmpDir, "dance-input-*.mp4")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp input file: %w", err)
+	}
+	defer os.Remove(tmpIn.Name())
+	defer tmpIn.Close()
+
+	if _, err := tmpIn.Write(input); err != nil {
+		return nil, fmt.Errorf("failed to write temp input file: %w", err)
+	}
+	tmpIn.Close()
+
+	tmpOut, err := os.CreateTemp(tmpDir, "dance-output-*.mp4")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp output file: %w", err)
+	}
+	defer os.Remove(tmpOut.Name())
+	tmpOut.Close()
+
+	cmd := exec.Command("ffmpeg",
+		"-y",
+		"-i", tmpIn.Name(),
+		"-c:v", "libx264",
+		"-preset", "fast",
+		"-crf", "23",
+		"-c:a", "aac",
+		"-movflags", "+faststart",
+		"-f", "mp4",
+		tmpOut.Name(),
+	)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("ffmpeg failed: %w, stderr: %s", err, stderr.String())
+	}
+
+	result, err := os.ReadFile(tmpOut.Name())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read output file: %w", err)
+	}
+
+	return result, nil
 }

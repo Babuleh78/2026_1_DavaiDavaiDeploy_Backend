@@ -173,6 +173,7 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, id uuid.UUID, oldPass
 
 type ProcessingResult struct {
     DanceID             string   `json:"dance_id"`
+	FullGlbKey          string   `json:"full_glb_key"`
     SegmentsKey         string   `json:"segments_key"`
     GlbKeys             []string `json:"glb_keys"`
     NumFrames           int      `json:"num_frames"`
@@ -227,6 +228,7 @@ func (uc *UserUsecase) UploadDance(
 
     return &users.UploadDanceResult{
         DanceID:             result.DanceID,
+		FullGlbKey:          result.FullGlbKey,
         SegmentsKey:         result.SegmentsKey,
         GlbKeys:             result.GlbKeys,
         NumFrames:           result.NumFrames,

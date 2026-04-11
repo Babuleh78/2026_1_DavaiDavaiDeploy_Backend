@@ -207,6 +207,7 @@ func (g GrpcAuthHandler) LoadDance(ctx context.Context, in *gen.LoadDanceRequest
 
 	return &gen.LoadDanceResponse{
 		DanceID:             result.DanceID,
+		FullGlbKey:          result.FullGlbKey,
 		GlbKeys:             result.GlbKeys,
 		NumSegmentsRendered: int32(result.NumSegmentsRendered),
 		SegmentsKey:         result.SegmentsKey,

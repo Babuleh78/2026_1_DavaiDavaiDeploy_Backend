@@ -6,6 +6,7 @@ import (
 
 type LoadDanceResponse struct {
 	DanceID             string   `json:"dance_id" binding:"required"`
+	FullGlbKey          string   `json:"full_glb_key" binding:"required"`
 	GlbKeys             []string `json:"glb_keys" binding:"required"`
 	SegmentsKey         string   `json:"segments_key" binding:"required"`
 	NumFrames           int      `json:"num_frames" binding:"required"`

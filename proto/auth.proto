@@ -88,11 +88,12 @@ message LoadDanceRequest {
 message LoadDanceResponse {
   string DanceID = 1;
   string SegmentsKey = 2;
-  repeated string GlbKeys = 3;
-  int32 NumFrames = 4;
-  int32 NumSegments = 5;
-  int32 NumSegmentsRendered = 6;
-  double DurationSec = 7;
+  string FullGlbKey= 3;
+  repeated string GlbKeys = 4;
+  int32 NumFrames = 5;
+  int32 NumSegments = 6;
+  int32 NumSegmentsRendered = 7;
+  double DurationSec = 8;
 }
 
 message LogOutUserRequest{
@@ -107,3 +108,6 @@ message LogOutUserResponse{}
 message ValidateAndGetUserRequest{
   string Token = 1;
 }
+
+
+
