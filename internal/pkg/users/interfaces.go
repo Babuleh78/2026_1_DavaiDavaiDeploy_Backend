@@ -17,7 +17,7 @@ type UsersUsecase interface {
 	UploadDance(ctx context.Context, buffer []byte, fileFormat string) (*models.UploadDanceResult, error)
 	UploadDanceByURL(ctx context.Context, videoURL string) (*models.UploadDanceResult, error)
 	GetDanceByID(ctx context.Context, danceID string) (*models.UploadDanceResult, error)
-	
+	GetSegmentDescription(ctx context.Context, danceID string, segmentIdx int) (*models.SegmentDescriptionResult, error)
 	GetMainPage(ctx context.Context) ([]models.VideoItem, error)
 }
 

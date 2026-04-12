@@ -57,6 +57,15 @@ definitions:
           $ref: '#/definitions/DDDance_internal_models.VideoItem'
         type: array
     type: object
+  DDDance_internal_models.SegmentDescriptionResponse:
+    properties:
+      dance_id:
+        type: string
+      description:
+        type: string
+      segment_idx:
+        type: integer
+    type: object
   DDDance_internal_models.SignInInput:
     properties:
       login:
@@ -233,6 +242,35 @@ paths:
         "500":
           description: Internal Server Error
       summary: Get user by ID
+      tags:
+      - users
+  /users/dance/{dance_id}/segment/{segment_idx}:
+    get:
+      parameters:
+      - description: Dance ID
+        in: path
+        name: dance_id
+        required: true
+        type: string
+      - description: Segment index
+        in: path
+        name: segment_idx
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.SegmentDescriptionResponse'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get segment description by dance ID and segment index
       tags:
       - users
   /users/dance/{id}:

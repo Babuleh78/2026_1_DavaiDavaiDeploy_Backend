@@ -12,6 +12,7 @@ service Auth {
   rpc LoadDanceByURL(LoadDanceByURLRequest) returns (LoadDanceResponse) {}
   rpc GetDanceByID(GetDanceByIDRequest) returns (LoadDanceResponse) {}
   rpc GetMainPage(GetMainPageRequest) returns (GetMainPageResponse) {}
+  rpc GetSegmentDescription(GetSegmentDescriptionRequest) returns (GetSegmentDescriptionResponse) {}
 
 
   rpc ValidateAndGetUser(ValidateAndGetUserRequest) returns (UserResponse) {}
@@ -133,4 +134,15 @@ message VideoItem {
 message GetMainPageResponse {
   int32 Count = 1;
   repeated VideoItem Videos = 2;
+}
+
+message GetSegmentDescriptionRequest {
+    string DanceId = 1;
+    int32 SegmentIdx = 2;
+}
+
+message GetSegmentDescriptionResponse {
+    string DanceId = 1;
+    int32 SegmentIdx = 2;
+    string Description = 3;
 }

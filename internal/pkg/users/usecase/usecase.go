@@ -419,3 +419,32 @@ func (uc *UserUsecase) GetMainPage(ctx context.Context) ([]models.VideoItem, err
 
     return videos, nil
 }
+
+func (uc *UserUsecase) GetSegmentDescription(ctx context.Context, danceID string, segmentIdx int) (*models.SegmentDescriptionResult, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    mlURL := fmt.Sprintf("%s/segment_description/%s/%d", os.Getenv("ML_SERVICE_URL"), danceID, segmentIdx)
+    client := &http.Client{Timeout: 10 * time.Second}
+
+    resp, err := client.Get(mlURL)
+    if err != nil {
+        logger.Error("failed to call ml service", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode == http.StatusNotFound {
+        return nil, users.ErrorNotFound
+    }
+    if resp.StatusCode != http.StatusOK {
+        return nil, users.ErrorInternalServerError
+    }
+
+    var result models.SegmentDescriptionResult
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        logger.Error("failed to decode response", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    return &result, nil
+}

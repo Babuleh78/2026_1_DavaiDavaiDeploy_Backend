@@ -287,3 +287,21 @@ func (g GrpcAuthHandler) GetMainPage(ctx context.Context, in *gen.GetMainPageReq
         Videos: items,
     }, nil
 }
+
+func (g GrpcAuthHandler) GetSegmentDescription(ctx context.Context, in *gen.GetSegmentDescriptionRequest) (*gen.GetSegmentDescriptionResponse, error) {
+    result, err := g.uuc.GetSegmentDescription(ctx, in.DanceId, int(in.SegmentIdx))
+    if err != nil {
+        switch err {
+        case users.ErrorNotFound:
+            return nil, status.Errorf(codes.NotFound, "%v", err)
+        default:
+            return nil, status.Errorf(codes.Internal, "%v", err)
+        }
+    }
+
+    return &gen.GetSegmentDescriptionResponse{
+        DanceId:     result.DanceID,
+        SegmentIdx:  int32(result.SegmentIdx),
+        Description: result.Description,
+    }, nil
+}

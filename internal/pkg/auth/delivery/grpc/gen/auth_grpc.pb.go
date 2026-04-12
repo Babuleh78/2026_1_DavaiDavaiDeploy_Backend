@@ -2,7 +2,7 @@
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v7.34.1
-// source: proto/auth.proto
+// source: auth.proto
 
 package gen
 
@@ -19,20 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Auth_SignupUser_FullMethodName         = "/auth.Auth/SignupUser"
-	Auth_SignInUser_FullMethodName         = "/auth.Auth/SignInUser"
-	Auth_LogOutUser_FullMethodName         = "/auth.Auth/LogOutUser"
-	Auth_GetUser_FullMethodName            = "/auth.Auth/GetUser"
-	Auth_ChangePassword_FullMethodName     = "/auth.Auth/ChangePassword"
-	Auth_LoadDance_FullMethodName          = "/auth.Auth/LoadDance"
-	Auth_LoadDanceByURL_FullMethodName     = "/auth.Auth/LoadDanceByURL"
-	Auth_GetDanceByID_FullMethodName       = "/auth.Auth/GetDanceByID"
-	Auth_GetMainPage_FullMethodName        = "/auth.Auth/GetMainPage"
-	Auth_ValidateAndGetUser_FullMethodName = "/auth.Auth/ValidateAndGetUser"
-	Auth_Enable2Fa_FullMethodName          = "/auth.Auth/Enable2fa"
-	Auth_Disable2Fa_FullMethodName         = "/auth.Auth/Disable2fa"
-	Auth_SignUpUserVK_FullMethodName       = "/auth.Auth/SignUpUserVK"
-	Auth_SignInUserVK_FullMethodName       = "/auth.Auth/SignInUserVK"
+	Auth_SignupUser_FullMethodName            = "/auth.Auth/SignupUser"
+	Auth_SignInUser_FullMethodName            = "/auth.Auth/SignInUser"
+	Auth_LogOutUser_FullMethodName            = "/auth.Auth/LogOutUser"
+	Auth_GetUser_FullMethodName               = "/auth.Auth/GetUser"
+	Auth_ChangePassword_FullMethodName        = "/auth.Auth/ChangePassword"
+	Auth_LoadDance_FullMethodName             = "/auth.Auth/LoadDance"
+	Auth_LoadDanceByURL_FullMethodName        = "/auth.Auth/LoadDanceByURL"
+	Auth_GetDanceByID_FullMethodName          = "/auth.Auth/GetDanceByID"
+	Auth_GetMainPage_FullMethodName           = "/auth.Auth/GetMainPage"
+	Auth_GetSegmentDescription_FullMethodName = "/auth.Auth/GetSegmentDescription"
+	Auth_ValidateAndGetUser_FullMethodName    = "/auth.Auth/ValidateAndGetUser"
+	Auth_Enable2Fa_FullMethodName             = "/auth.Auth/Enable2fa"
+	Auth_Disable2Fa_FullMethodName            = "/auth.Auth/Disable2fa"
+	Auth_SignUpUserVK_FullMethodName          = "/auth.Auth/SignUpUserVK"
+	Auth_SignInUserVK_FullMethodName          = "/auth.Auth/SignInUserVK"
 )
 
 // AuthClient is the client API for Auth service.
@@ -48,6 +49,7 @@ type AuthClient interface {
 	LoadDanceByURL(ctx context.Context, in *LoadDanceByURLRequest, opts ...grpc.CallOption) (*LoadDanceResponse, error)
 	GetDanceByID(ctx context.Context, in *GetDanceByIDRequest, opts ...grpc.CallOption) (*LoadDanceResponse, error)
 	GetMainPage(ctx context.Context, in *GetMainPageRequest, opts ...grpc.CallOption) (*GetMainPageResponse, error)
+	GetSegmentDescription(ctx context.Context, in *GetSegmentDescriptionRequest, opts ...grpc.CallOption) (*GetSegmentDescriptionResponse, error)
 	ValidateAndGetUser(ctx context.Context, in *ValidateAndGetUserRequest, opts ...grpc.CallOption) (*UserResponse, error)
 	Enable2Fa(ctx context.Context, in *Enable2FaRequest, opts ...grpc.CallOption) (*Enable2FaResponse, error)
 	Disable2Fa(ctx context.Context, in *Disable2FaRequest, opts ...grpc.CallOption) (*Disable2FaResponse, error)
@@ -153,6 +155,16 @@ func (c *authClient) GetMainPage(ctx context.Context, in *GetMainPageRequest, op
 	return out, nil
 }
 
+func (c *authClient) GetSegmentDescription(ctx context.Context, in *GetSegmentDescriptionRequest, opts ...grpc.CallOption) (*GetSegmentDescriptionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSegmentDescriptionResponse)
+	err := c.cc.Invoke(ctx, Auth_GetSegmentDescription_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authClient) ValidateAndGetUser(ctx context.Context, in *ValidateAndGetUserRequest, opts ...grpc.CallOption) (*UserResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UserResponse)
@@ -216,6 +228,7 @@ type AuthServer interface {
 	LoadDanceByURL(context.Context, *LoadDanceByURLRequest) (*LoadDanceResponse, error)
 	GetDanceByID(context.Context, *GetDanceByIDRequest) (*LoadDanceResponse, error)
 	GetMainPage(context.Context, *GetMainPageRequest) (*GetMainPageResponse, error)
+	GetSegmentDescription(context.Context, *GetSegmentDescriptionRequest) (*GetSegmentDescriptionResponse, error)
 	ValidateAndGetUser(context.Context, *ValidateAndGetUserRequest) (*UserResponse, error)
 	Enable2Fa(context.Context, *Enable2FaRequest) (*Enable2FaResponse, error)
 	Disable2Fa(context.Context, *Disable2FaRequest) (*Disable2FaResponse, error)
@@ -257,6 +270,9 @@ func (UnimplementedAuthServer) GetDanceByID(context.Context, *GetDanceByIDReques
 }
 func (UnimplementedAuthServer) GetMainPage(context.Context, *GetMainPageRequest) (*GetMainPageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMainPage not implemented")
+}
+func (UnimplementedAuthServer) GetSegmentDescription(context.Context, *GetSegmentDescriptionRequest) (*GetSegmentDescriptionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSegmentDescription not implemented")
 }
 func (UnimplementedAuthServer) ValidateAndGetUser(context.Context, *ValidateAndGetUserRequest) (*UserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateAndGetUser not implemented")
@@ -456,6 +472,24 @@ func _Auth_GetMainPage_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Auth_GetSegmentDescription_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSegmentDescriptionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).GetSegmentDescription(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_GetSegmentDescription_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).GetSegmentDescription(ctx, req.(*GetSegmentDescriptionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Auth_ValidateAndGetUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ValidateAndGetUserRequest)
 	if err := dec(in); err != nil {
@@ -590,6 +624,10 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Auth_GetMainPage_Handler,
 		},
 		{
+			MethodName: "GetSegmentDescription",
+			Handler:    _Auth_GetSegmentDescription_Handler,
+		},
+		{
 			MethodName: "ValidateAndGetUser",
 			Handler:    _Auth_ValidateAndGetUser_Handler,
 		},
@@ -611,5 +649,5 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "proto/auth.proto",
+	Metadata: "auth.proto",
 }

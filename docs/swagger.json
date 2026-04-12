@@ -150,6 +150,50 @@
                 }
             }
         },
+        "/users/dance/{dance_id}/segment/{segment_idx}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get segment description by dance ID and segment index",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Dance ID",
+                        "name": "dance_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Segment index",
+                        "name": "segment_idx",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/DDDance_internal_models.SegmentDescriptionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "description": "Not Found"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/users/dance/{id}": {
             "get": {
                 "produces": [
@@ -449,6 +493,20 @@
                     "items": {
                         "$ref": "#/definitions/DDDance_internal_models.VideoItem"
                     }
+                }
+            }
+        },
+        "DDDance_internal_models.SegmentDescriptionResponse": {
+            "type": "object",
+            "properties": {
+                "dance_id": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "segment_idx": {
+                    "type": "integer"
                 }
             }
         },

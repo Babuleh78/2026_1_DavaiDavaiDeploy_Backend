@@ -17,7 +17,8 @@ import (
 	"os/exec"
 	"fmt"
 	"bytes"
-
+	"strconv"
+	
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc/codes"
@@ -555,6 +556,63 @@ func (u *UserHandler) GetMainPage(w http.ResponseWriter, r *http.Request) {
     response := models.MainPageResponse{
         Count:  int(result.Count),
         Videos: videos,
+    }
+
+    helpers.WriteJSON(w, response)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+
+// GetSegmentDescription godoc
+// @Summary Get segment description by dance ID and segment index
+// @Tags users
+// @Produce json
+// @Param dance_id path string true "Dance ID"
+// @Param segment_idx path int true "Segment index"
+// @Success 200 {object} models.SegmentDescriptionResponse
+// @Failure 400
+// @Failure 404
+// @Failure 500
+// @Router /users/dance/{dance_id}/segment/{segment_idx} [get]
+func (u *UserHandler) GetSegmentDescription(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    vars := mux.Vars(r)
+    danceID := vars["dance_id"]
+    segmentIdxStr := vars["segment_idx"]
+
+    if danceID == "" || segmentIdxStr == "" {
+        log.LogHandlerError(logger, errors.New("dance_id and segment_idx are required"), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    segmentIdx, err := strconv.Atoi(segmentIdxStr)
+    if err != nil || segmentIdx < 0 {
+        log.LogHandlerError(logger, errors.New("invalid segment_idx"), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    result, err := u.client.GetSegmentDescription(r.Context(), &gen.GetSegmentDescriptionRequest{
+        DanceId:    danceID,
+        SegmentIdx: int32(segmentIdx),
+    })
+    if err != nil {
+        st, _ := status.FromError(err)
+        switch st.Code() {
+        case codes.NotFound:
+            helpers.WriteError(w, http.StatusNotFound)
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
+
+    response := models.SegmentDescriptionResponse{
+        DanceID:     result.DanceId,
+        SegmentIdx:  int(result.SegmentIdx),
+        Description: result.Description,
     }
 
     helpers.WriteJSON(w, response)

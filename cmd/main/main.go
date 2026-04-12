@@ -111,6 +111,7 @@ func main() {
 	userRouter.HandleFunc("/loadByURL", userHandler.LoadDanceByURL).Methods(http.MethodPost)
 	userRouter.HandleFunc("/dance/{id}", userHandler.GetDanceByID).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/main_page", userHandler.GetMainPage).Methods(http.MethodGet, http.MethodOptions)
+	userRouter.HandleFunc("/dance/{dance_id}/segment/{segment_idx}", userHandler.GetSegmentDescription).Methods(http.MethodGet, http.MethodOptions)
 	// Protected user routes
 	protectedUserRouter := userRouter.PathPrefix("").Subrouter()
 	protectedUserRouter.Use(userHandler.Middleware)
