@@ -214,5 +214,76 @@ func (g GrpcAuthHandler) LoadDance(ctx context.Context, in *gen.LoadDanceRequest
 		NumFrames:           int32(result.NumFrames),
 		NumSegments:         int32(result.NumSegments),
 		DurationSec:         result.DurationSec,
+		VideoPath:			 result.VideoPath,
 	}, nil
+}
+
+func (g GrpcAuthHandler) LoadDanceByURL(ctx context.Context, in *gen.LoadDanceByURLRequest) (*gen.LoadDanceResponse, error) {
+    result, err := g.uuc.UploadDanceByURL(ctx, in.Url)
+    if err != nil {
+        switch err {
+        case users.ErrorBadRequest:
+            return nil, status.Errorf(codes.InvalidArgument, "%v", err)
+        case users.ErrorNotFound:
+            return nil, status.Errorf(codes.NotFound, "%v", err)
+        default:
+            return nil, status.Errorf(codes.Internal, "%v", err)
+        }
+    }
+
+    return &gen.LoadDanceResponse{
+        DanceID:             result.DanceID,
+        FullGlbKey:          result.FullGlbKey,
+        GlbKeys:             result.GlbKeys,
+        NumSegmentsRendered: int32(result.NumSegmentsRendered),
+        SegmentsKey:         result.SegmentsKey,
+        NumFrames:           int32(result.NumFrames),
+        NumSegments:         int32(result.NumSegments),
+        DurationSec:         result.DurationSec,
+		VideoPath:			 result.VideoPath,
+    }, nil
+}
+
+func (g GrpcAuthHandler) GetDanceByID(ctx context.Context, in *gen.GetDanceByIDRequest) (*gen.LoadDanceResponse, error) {
+    result, err := g.uuc.GetDanceByID(ctx, in.DanceId)
+    if err != nil {
+        switch err {
+        case users.ErrorNotFound:
+            return nil, status.Errorf(codes.NotFound, "%v", err)
+        default:
+            return nil, status.Errorf(codes.Internal, "%v", err)
+        }
+    }
+
+    return &gen.LoadDanceResponse{
+        DanceID:             result.DanceID,
+        FullGlbKey:          result.FullGlbKey,
+        GlbKeys:             result.GlbKeys,
+        NumSegmentsRendered: int32(result.NumSegmentsRendered),
+        SegmentsKey:         result.SegmentsKey,
+        NumFrames:           int32(result.NumFrames),
+        NumSegments:         int32(result.NumSegments),
+        DurationSec:         result.DurationSec,
+		VideoPath:			 result.VideoPath,
+    }, nil
+}
+
+func (g GrpcAuthHandler) GetMainPage(ctx context.Context, in *gen.GetMainPageRequest) (*gen.GetMainPageResponse, error) {
+    videos, err := g.uuc.GetMainPage(ctx)
+    if err != nil {
+        return nil, status.Errorf(codes.Internal, "%v", err)
+    }
+
+    var items []*gen.VideoItem
+    for _, v := range videos {
+        items = append(items, &gen.VideoItem{
+            ID:  v.ID,
+            URL: v.URL,
+        })
+    }
+
+    return &gen.GetMainPageResponse{
+        Count:  int32(len(items)),
+        Videos: items,
+    }, nil
 }

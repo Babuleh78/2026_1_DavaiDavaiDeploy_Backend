@@ -1,6 +1,6 @@
 basePath: /api
 definitions:
-  models.ChangePasswordInput:
+  DDDance_internal_models.ChangePasswordInput:
     properties:
       new_password:
         type: string
@@ -10,26 +10,54 @@ definitions:
     - new_password
     - old_password
     type: object
-  models.LoadDanceResponse:
+  DDDance_internal_models.LoadDanceByURLInput:
     properties:
+      url:
+        type: string
+    type: object
+  DDDance_internal_models.LoadDanceResponse:
+    properties:
+      dance_id:
+        type: string
       duration_sec:
         type: number
+      full_glb_key:
+        type: string
+      glb_keys:
+        items:
+          type: string
+        type: array
       num_frames:
         type: integer
       num_segments:
         type: integer
-      result_key:
-        type: string
+      num_segments_rendered:
+        type: integer
       segments_key:
         type: string
+      video_path:
+        type: string
     required:
+    - dance_id
     - duration_sec
+    - full_glb_key
+    - glb_keys
     - num_frames
     - num_segments
-    - result_key
+    - num_segments_rendered
     - segments_key
+    - video_path
     type: object
-  models.SignInInput:
+  DDDance_internal_models.MainPageResponse:
+    properties:
+      count:
+        type: integer
+      videos:
+        items:
+          $ref: '#/definitions/DDDance_internal_models.VideoItem'
+        type: array
+    type: object
+  DDDance_internal_models.SignInInput:
     properties:
       login:
         type: string
@@ -41,7 +69,7 @@ definitions:
     - login
     - password
     type: object
-  models.SignUpInput:
+  DDDance_internal_models.SignUpInput:
     properties:
       login:
         type: string
@@ -51,7 +79,7 @@ definitions:
     - login
     - password
     type: object
-  models.User:
+  DDDance_internal_models.User:
     properties:
       avatar:
         type: string
@@ -77,6 +105,13 @@ definitions:
     - login
     - version
     type: object
+  DDDance_internal_models.VideoItem:
+    properties:
+      id:
+        type: string
+      url:
+        type: string
+    type: object
 host: localhost:5458
 info:
   contact: {}
@@ -93,7 +128,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.User'
+            $ref: '#/definitions/DDDance_internal_models.User'
         "401":
           description: Unauthorized
         "500":
@@ -131,14 +166,14 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/models.SignInInput'
+          $ref: '#/definitions/DDDance_internal_models.SignInInput'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.User'
+            $ref: '#/definitions/DDDance_internal_models.User'
         "400":
           description: Bad Request
         "401":
@@ -159,14 +194,14 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/models.SignUpInput'
+          $ref: '#/definitions/DDDance_internal_models.SignUpInput'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.User'
+            $ref: '#/definitions/DDDance_internal_models.User'
         "400":
           description: Bad Request
         "409":
@@ -190,7 +225,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.User'
+            $ref: '#/definitions/DDDance_internal_models.User'
         "400":
           description: Bad Request
         "404":
@@ -200,7 +235,31 @@ paths:
       summary: Get user by ID
       tags:
       - users
-  /users/dance:
+  /users/dance/{id}:
+    get:
+      parameters:
+      - description: Dance ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.LoadDanceResponse'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get dance result by ID
+      tags:
+      - users
+  /users/load:
     post:
       consumes:
       - multipart/form-data
@@ -216,7 +275,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.LoadDanceResponse'
+            $ref: '#/definitions/DDDance_internal_models.LoadDanceResponse'
         "400":
           description: Bad Request
         "413":
@@ -224,6 +283,45 @@ paths:
         "500":
           description: Internal Server Error
       summary: Load Dance
+      tags:
+      - users
+  /users/loadByURL:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Dance URL and dance_id
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/DDDance_internal_models.LoadDanceByURLInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.LoadDanceResponse'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Load Dance by URL
+      tags:
+      - users
+  /users/main_page:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.MainPageResponse'
+        "500":
+          description: Internal Server Error
+      summary: Get main page videos
       tags:
       - users
   /users/password:
@@ -236,14 +334,14 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/models.ChangePasswordInput'
+          $ref: '#/definitions/DDDance_internal_models.ChangePasswordInput'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/models.User'
+            $ref: '#/definitions/DDDance_internal_models.User'
         "400":
           description: Bad Request
         "401":

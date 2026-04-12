@@ -9,6 +9,11 @@ service Auth {
   rpc GetUser(GetUserRequest) returns (UserResponse) {}
   rpc ChangePassword(ChangePasswordRequest) returns (AuthResponse) {}
   rpc LoadDance(LoadDanceRequest) returns (LoadDanceResponse) {}
+  rpc LoadDanceByURL(LoadDanceByURLRequest) returns (LoadDanceResponse) {}
+  rpc GetDanceByID(GetDanceByIDRequest) returns (LoadDanceResponse) {}
+  rpc GetMainPage(GetMainPageRequest) returns (GetMainPageResponse) {}
+
+
   rpc ValidateAndGetUser(ValidateAndGetUserRequest) returns (UserResponse) {}
 
   rpc Enable2fa(Enable2faRequest) returns (Enable2faResponse) {}
@@ -85,6 +90,10 @@ message LoadDanceRequest {
   string FileFormat = 2;
 }
 
+message LoadDanceByURLRequest {
+  string Url = 1;
+}
+
 message LoadDanceResponse {
   string DanceID = 1;
   string SegmentsKey = 2;
@@ -94,6 +103,7 @@ message LoadDanceResponse {
   int32 NumSegments = 6;
   int32 NumSegmentsRendered = 7;
   double DurationSec = 8;
+  string VideoPath = 9;
 }
 
 message LogOutUserRequest{
@@ -109,5 +119,18 @@ message ValidateAndGetUserRequest{
   string Token = 1;
 }
 
+message GetDanceByIDRequest {
+  string DanceId = 1;
+}
 
+message GetMainPageRequest {}
 
+message VideoItem {
+  string ID = 1;
+  string URL = 2;
+}
+
+message GetMainPageResponse {
+  int32 Count = 1;
+  repeated VideoItem Videos = 2;
+}

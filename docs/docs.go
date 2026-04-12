@@ -29,7 +29,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/DDDance_internal_models.User"
                         }
                     },
                     "401": {
@@ -90,7 +90,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.SignInInput"
+                            "$ref": "#/definitions/DDDance_internal_models.SignInInput"
                         }
                     }
                 ],
@@ -98,7 +98,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/DDDance_internal_models.User"
                         }
                     },
                     "400": {
@@ -133,7 +133,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.SignUpInput"
+                            "$ref": "#/definitions/DDDance_internal_models.SignUpInput"
                         }
                     }
                 ],
@@ -141,7 +141,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/DDDance_internal_models.User"
                         }
                     },
                     "400": {
@@ -156,7 +156,44 @@ const docTemplate = `{
                 }
             }
         },
-        "/users/dance": {
+        "/users/dance/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get dance result by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Dance ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/DDDance_internal_models.LoadDanceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "404": {
+                        "description": "Not Found"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/users/load": {
             "post": {
                 "consumes": [
                     "multipart/form-data"
@@ -181,7 +218,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.LoadDanceResponse"
+                            "$ref": "#/definitions/DDDance_internal_models.LoadDanceResponse"
                         }
                     },
                     "400": {
@@ -189,6 +226,67 @@ const docTemplate = `{
                     },
                     "413": {
                         "description": "Request Entity Too Large"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/users/loadByURL": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Load Dance by URL",
+                "parameters": [
+                    {
+                        "description": "Dance URL and dance_id",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/DDDance_internal_models.LoadDanceByURLInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/DDDance_internal_models.LoadDanceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/users/main_page": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get main page videos",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/DDDance_internal_models.MainPageResponse"
+                        }
                     },
                     "500": {
                         "description": "Internal Server Error"
@@ -215,7 +313,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/models.ChangePasswordInput"
+                            "$ref": "#/definitions/DDDance_internal_models.ChangePasswordInput"
                         }
                     }
                 ],
@@ -223,7 +321,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/DDDance_internal_models.User"
                         }
                     },
                     "400": {
@@ -260,7 +358,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/models.User"
+                            "$ref": "#/definitions/DDDance_internal_models.User"
                         }
                     },
                     "400": {
@@ -277,7 +375,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "models.ChangePasswordInput": {
+        "DDDance_internal_models.ChangePasswordInput": {
             "type": "object",
             "required": [
                 "new_password",
@@ -292,18 +390,42 @@ const docTemplate = `{
                 }
             }
         },
-        "models.LoadDanceResponse": {
+        "DDDance_internal_models.LoadDanceByURLInput": {
+            "type": "object",
+            "properties": {
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "DDDance_internal_models.LoadDanceResponse": {
             "type": "object",
             "required": [
+                "dance_id",
                 "duration_sec",
+                "full_glb_key",
+                "glb_keys",
                 "num_frames",
                 "num_segments",
-                "result_key",
-                "segments_key"
+                "num_segments_rendered",
+                "segments_key",
+                "video_path"
             ],
             "properties": {
+                "dance_id": {
+                    "type": "string"
+                },
                 "duration_sec": {
                     "type": "number"
+                },
+                "full_glb_key": {
+                    "type": "string"
+                },
+                "glb_keys": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "num_frames": {
                     "type": "integer"
@@ -311,15 +433,32 @@ const docTemplate = `{
                 "num_segments": {
                     "type": "integer"
                 },
-                "result_key": {
-                    "type": "string"
+                "num_segments_rendered": {
+                    "type": "integer"
                 },
                 "segments_key": {
+                    "type": "string"
+                },
+                "video_path": {
                     "type": "string"
                 }
             }
         },
-        "models.SignInInput": {
+        "DDDance_internal_models.MainPageResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "videos": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/DDDance_internal_models.VideoItem"
+                    }
+                }
+            }
+        },
+        "DDDance_internal_models.SignInInput": {
             "type": "object",
             "required": [
                 "login",
@@ -337,7 +476,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.SignUpInput": {
+        "DDDance_internal_models.SignUpInput": {
             "type": "object",
             "required": [
                 "login",
@@ -352,7 +491,7 @@ const docTemplate = `{
                 }
             }
         },
-        "models.User": {
+        "DDDance_internal_models.User": {
             "type": "object",
             "required": [
                 "avatar",
@@ -386,6 +525,17 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "DDDance_internal_models.VideoItem": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
                 }
             }
         }

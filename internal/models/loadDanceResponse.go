@@ -13,6 +13,7 @@ type LoadDanceResponse struct {
 	NumSegments         int      `json:"num_segments" binding:"required"`
 	DurationSec         float64  `json:"duration_sec" binding:"required"`
 	NumSegmentsRendered int      `json:"num_segments_rendered" binding:"required"`
+	VideoPath			string   `json:"video_path" binding:"required"`
 }
 
 func (l *LoadDanceResponse) Sanitize() {

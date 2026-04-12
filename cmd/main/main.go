@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "DDDance/docs"
 
 	authHandlers "DDDance/internal/pkg/auth/delivery/http"
 	authRepo "DDDance/internal/pkg/auth/repo"
@@ -106,18 +107,22 @@ func main() {
 	protectedAuthRouter.HandleFunc("/logout", authHandler.LogOutUser).Methods(http.MethodPost, http.MethodOptions)
 
 	userRouter := apiRouter.PathPrefix("/users").Subrouter()
-
+	userRouter.HandleFunc("/load", userHandler.LoadDance).Methods(http.MethodPost)
+	userRouter.HandleFunc("/loadByURL", userHandler.LoadDanceByURL).Methods(http.MethodPost)
+	userRouter.HandleFunc("/dance/{id}", userHandler.GetDanceByID).Methods(http.MethodGet, http.MethodOptions)
+	userRouter.HandleFunc("/main_page", userHandler.GetMainPage).Methods(http.MethodGet, http.MethodOptions)
 	// Protected user routes
 	protectedUserRouter := userRouter.PathPrefix("").Subrouter()
 	protectedUserRouter.Use(userHandler.Middleware)
 	protectedUserRouter.HandleFunc("/change/password", userHandler.ChangePassword).Methods(http.MethodPut, http.MethodOptions)
 
-	userRouter.HandleFunc("/load", userHandler.LoadDance).Methods(http.MethodPost)
 	danceSrv := http.Server{
 		Handler: mainRouter,
 		Addr:    ":5458",
 	}
 
+	
+	
 	go func() {
 		log.Println("Starting main server on port 5458!")
 		err := danceSrv.ListenAndServe()

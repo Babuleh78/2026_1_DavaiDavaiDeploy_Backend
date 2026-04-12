@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"time"
+	"strings"
 	
 
 	jwt "github.com/golang-jwt/jwt/v5"
@@ -171,22 +172,13 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, id uuid.UUID, oldPass
 }
 
 
-type ProcessingResult struct {
-    DanceID             string   `json:"dance_id"`
-	FullGlbKey          string   `json:"full_glb_key"`
-    SegmentsKey         string   `json:"segments_key"`
-    GlbKeys             []string `json:"glb_keys"`
-    NumFrames           int      `json:"num_frames"`
-    NumSegments         int      `json:"num_segments"`
-    NumSegmentsRendered int      `json:"num_segments_rendered"`
-    DurationSec         float64  `json:"duration_sec"`
-}
+
 
 func (uc *UserUsecase) UploadDance(
     ctx context.Context, 
     buffer []byte, 
     fileFormat string,
-) (*users.UploadDanceResult, error) {
+) (*models.UploadDanceResult, error) {
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
     var danceExtension string
@@ -226,7 +218,7 @@ func (uc *UserUsecase) UploadDance(
         return nil, users.ErrorInternalServerError
     }
 
-    return &users.UploadDanceResult{
+    return &models.UploadDanceResult{
         DanceID:             result.DanceID,
 		FullGlbKey:          result.FullGlbKey,
         SegmentsKey:         result.SegmentsKey,
@@ -235,6 +227,7 @@ func (uc *UserUsecase) UploadDance(
         NumSegments:         result.NumSegments,
         NumSegmentsRendered: result.NumSegmentsRendered,
         DurationSec:         result.DurationSec,
+		VideoPath: 		 	 result.VideoPath,
     }, nil
 }
 
@@ -242,7 +235,6 @@ func (uc *UserUsecase) UploadDance(
 func (uc *UserUsecase) enqueueProcessing(ctx context.Context, videoKey, danceID string) (string, error) {
 	//Кстати обратите внимание, ML_SERVICE_URL=http://ml-service:8000/ml, теперь нужно /ml прописывать, так надо
     processingURL := os.Getenv("ML_SERVICE_URL") + "/process"
-	// Только ключ и id, если непонятно, то с(пр)осите
     requestBody := map[string]string{
         "video_key": videoKey, 
         "dance_id":  danceID,
@@ -265,7 +257,7 @@ func (uc *UserUsecase) enqueueProcessing(ctx context.Context, videoKey, danceID 
 }
 
 
-func (uc *UserUsecase) waitForProcessing(ctx context.Context, taskID string, logger *slog.Logger) (*ProcessingResult, error) {
+func (uc *UserUsecase) waitForProcessing(ctx context.Context, taskID string, logger *slog.Logger) (*models.ProcessingResult, error) {
     statusURL := os.Getenv("ML_SERVICE_URL") + "/status/" + taskID
 
     // Таймаут всей операции — 10 минут
@@ -283,7 +275,7 @@ func (uc *UserUsecase) waitForProcessing(ctx context.Context, taskID string, log
 
         var status struct {
             Status string           `json:"status"`
-            Result *ProcessingResult `json:"result,omitempty"`
+            Result *models.ProcessingResult `json:"result,omitempty"`
         }
         json.NewDecoder(resp.Body).Decode(&status)
         resp.Body.Close()
@@ -299,4 +291,131 @@ func (uc *UserUsecase) waitForProcessing(ctx context.Context, taskID string, log
     }
 
     return nil, fmt.Errorf("processing timeout")
+}
+
+func (uc *UserUsecase) UploadDanceByURL(
+    ctx context.Context,
+    videoURL string,
+) (*models.UploadDanceResult, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    danceID := uuid.NewV4().String()
+    
+
+    taskID, err := uc.enqueueProcessingByURL(ctx, videoURL, danceID)
+    if err != nil {
+        logger.Error("failed to enqueue processing", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    result, err := uc.waitForProcessing(ctx, taskID, logger)
+    if err != nil {
+        logger.Error("processing failed", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    if result == nil {
+        logger.Error("processing returned nil result")
+        return nil, users.ErrorInternalServerError
+    }
+
+    return &models.UploadDanceResult{
+        DanceID:             result.DanceID,
+        FullGlbKey:          result.FullGlbKey,
+		VideoPath:			 result.VideoPath,
+        SegmentsKey:         result.SegmentsKey,
+        GlbKeys:             result.GlbKeys,
+        NumFrames:           result.NumFrames,
+        NumSegments:         result.NumSegments,
+        NumSegmentsRendered: result.NumSegmentsRendered,
+        DurationSec:         result.DurationSec,
+    }, nil
+}
+
+func (uc *UserUsecase) enqueueProcessingByURL(ctx context.Context, videoURL, danceID string) (string, error) {
+    processingURL := os.Getenv("ML_SERVICE_URL") + "/process-url"
+    requestBody := map[string]string{
+        "url":      videoURL,
+		"dance_id": danceID,
+    }
+
+    jsonBody, _ := json.Marshal(requestBody)
+    client := &http.Client{Timeout: 20 * time.Second}
+
+    resp, err := client.Post(processingURL, "application/json", bytes.NewBuffer(jsonBody))
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+
+    var response struct {
+        TaskID string `json:"task_id"`
+    }
+    json.NewDecoder(resp.Body).Decode(&response)
+    return response.TaskID, nil
+}
+
+func (uc *UserUsecase) GetDanceByID(ctx context.Context, danceID string) (*models.UploadDanceResult, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    segmentsKey := fmt.Sprintf("results/%s/segments.json", danceID)
+    
+    data, err := uc.storageRepo.DownloadFile(ctx, segmentsKey)
+    if err != nil {
+        logger.Error("failed to get segments.json", "error", err)
+        return nil, users.ErrorNotFound
+    }
+
+    var segments struct {
+        DanceID     string `json:"dance_id"`
+        NumSegments int    `json:"num_segments"`
+        Meta        struct {
+            NumFrames   int     `json:"num_frames"`
+            DurationSec float64 `json:"duration_sec"`
+        } `json:"meta"`
+    }
+    if err := json.Unmarshal(data, &segments); err != nil {
+        logger.Error("failed to parse segments.json", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    glbKeys := make([]string, segments.NumSegments)
+    for i := 0; i < segments.NumSegments; i++ {
+        glbKeys[i] = fmt.Sprintf("results/%s/segment_%d.glb", danceID, i)
+    }
+
+    return &models.UploadDanceResult{
+        DanceID:             danceID,
+        SegmentsKey:         segmentsKey,
+        FullGlbKey:          fmt.Sprintf("results/%s/full_animation.glb", danceID),
+        GlbKeys:             glbKeys,
+        NumFrames:           segments.Meta.NumFrames,
+        NumSegments:         segments.NumSegments,
+        NumSegmentsRendered: segments.NumSegments,
+        DurationSec:         segments.Meta.DurationSec,
+        VideoPath:           fmt.Sprintf("results/%s/video.mp4", danceID),
+    }, nil
+}
+
+func (uc *UserUsecase) GetMainPage(ctx context.Context) ([]models.VideoItem, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    danceIDs, err := uc.storageRepo.ListDances(ctx, 9)
+    if err != nil {
+        logger.Error("failed to list dances", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    s3Address := os.Getenv("S3_ADDRESS")
+    s3Address = strings.TrimRight(s3Address, "/")
+
+    var videos []models.VideoItem
+    for _, id := range danceIDs {
+        videos = append(videos, models.VideoItem{
+            ID:  id,
+            URL: fmt.Sprintf("%s/results/%s/video.mp4", s3Address, id),
+        })
+    }
+
+    return videos, nil
 }

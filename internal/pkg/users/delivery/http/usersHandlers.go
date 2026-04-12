@@ -272,7 +272,7 @@ func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 // @Failure 400
 // @Failure 413
 // @Failure 500
-// @Router /users/dance [post]
+// @Router /users/load [post]
 func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 
@@ -350,6 +350,7 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 		NumSegments:         int(danceResult.NumSegments),
 		DurationSec:         danceResult.DurationSec,
 		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
+		VideoPath:			 danceResult.VideoPath,
 	}
 
 	response.Sanitize()
@@ -359,6 +360,7 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 }
 
 func convertToH264(input []byte) ([]byte, error) {
+	
 	tmpDir := "/dddance-back/tmp"
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		tmpDir = "."
@@ -408,4 +410,153 @@ func convertToH264(input []byte) ([]byte, error) {
 	}
 
 	return result, nil
+}
+
+
+// LoadDanceByURL godoc
+// @Summary Load Dance by URL
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param input body models.LoadDanceByURLInput true "Dance URL and dance_id"
+// @Success 200 {object} models.LoadDanceResponse
+// @Failure 400
+// @Failure 500
+// @Router /users/loadByURL [post]
+func (u *UserHandler) LoadDanceByURL(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    var req models.LoadDanceByURLInput
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        log.LogHandlerError(logger, fmt.Errorf("invalid request body: %w", err), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+    req.Sanitize()
+
+    if req.URL == "" {
+        log.LogHandlerError(logger, errors.New("url is required"), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    danceResult, err := u.client.LoadDanceByURL(r.Context(), &gen.LoadDanceByURLRequest{
+        Url:     req.URL,
+    })
+    if err != nil {
+        st, _ := status.FromError(err)
+        switch st.Code() {
+        case codes.InvalidArgument:
+            helpers.WriteError(w, http.StatusBadRequest)
+        case codes.NotFound:
+            helpers.WriteError(w, http.StatusNotFound)
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
+
+    response := models.LoadDanceResponse{
+        DanceID:             danceResult.DanceID,
+        FullGlbKey:          danceResult.FullGlbKey,
+        GlbKeys:             danceResult.GlbKeys,
+        SegmentsKey:         danceResult.SegmentsKey,
+        NumFrames:           int(danceResult.NumFrames),
+        NumSegments:         int(danceResult.NumSegments),
+        DurationSec:         danceResult.DurationSec,
+        NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
+    }
+    response.Sanitize()
+
+    helpers.WriteJSON(w, response)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// GetDanceByID godoc
+// @Summary Get dance result by ID
+// @Tags users
+// @Produce json
+// @Param id path string true "Dance ID"
+// @Success 200 {object} models.LoadDanceResponse
+// @Failure 400
+// @Failure 404
+// @Failure 500
+// @Router /users/dance/{id} [get]
+func (u *UserHandler) GetDanceByID(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    vars := mux.Vars(r)
+    danceID := vars["id"]
+    if danceID == "" {
+        log.LogHandlerError(logger, errors.New("dance id is required"), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    danceResult, err := u.client.GetDanceByID(r.Context(), &gen.GetDanceByIDRequest{
+        DanceId: danceID,
+    })
+    if err != nil {
+        st, _ := status.FromError(err)
+        switch st.Code() {
+        case codes.NotFound:
+            helpers.WriteError(w, http.StatusNotFound)
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
+
+    response := models.LoadDanceResponse{
+		DanceID:             danceResult.DanceID,
+		FullGlbKey:          danceResult.FullGlbKey,
+		GlbKeys:             danceResult.GlbKeys,
+		SegmentsKey:         danceResult.SegmentsKey,
+		NumFrames:           int(danceResult.NumFrames),
+		NumSegments:         int(danceResult.NumSegments),
+		DurationSec:         danceResult.DurationSec,
+		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
+		VideoPath:           danceResult.VideoPath,
+	}
+    response.Sanitize()
+
+    helpers.WriteJSON(w, response)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// GetMainPage godoc
+// @Summary Get main page videos
+// @Tags users
+// @Produce json
+// @Success 200 {object} models.MainPageResponse
+// @Failure 500
+// @Router /users/main_page [get]
+func (u *UserHandler) GetMainPage(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    result, err := u.client.GetMainPage(r.Context(), &gen.GetMainPageRequest{})
+    if err != nil {
+        st, _ := status.FromError(err)
+        switch st.Code() {
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
+
+    var videos []models.VideoItem
+    for _, v := range result.Videos {
+        videos = append(videos, models.VideoItem{
+            ID:  v.ID,
+            URL: v.URL,
+        })
+    }
+
+    response := models.MainPageResponse{
+        Count:  int(result.Count),
+        Videos: videos,
+    }
+
+    helpers.WriteJSON(w, response)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
