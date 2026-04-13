@@ -1,0 +1,392 @@
+basePath: /api
+definitions:
+  DDDance_internal_models.ChangePasswordInput:
+    properties:
+      new_password:
+        type: string
+      old_password:
+        type: string
+    required:
+    - new_password
+    - old_password
+    type: object
+  DDDance_internal_models.LoadDanceByURLInput:
+    properties:
+      url:
+        type: string
+    type: object
+  DDDance_internal_models.LoadDanceResponse:
+    properties:
+      dance_id:
+        type: string
+      duration_sec:
+        type: number
+      full_glb_key:
+        type: string
+      glb_keys:
+        items:
+          type: string
+        type: array
+      num_frames:
+        type: integer
+      num_segments:
+        type: integer
+      num_segments_rendered:
+        type: integer
+      segments_key:
+        type: string
+      video_path:
+        type: string
+    required:
+    - dance_id
+    - duration_sec
+    - full_glb_key
+    - glb_keys
+    - num_frames
+    - num_segments
+    - num_segments_rendered
+    - segments_key
+    - video_path
+    type: object
+  DDDance_internal_models.MainPageResponse:
+    properties:
+      count:
+        type: integer
+      videos:
+        items:
+          $ref: '#/definitions/DDDance_internal_models.VideoItem'
+        type: array
+    type: object
+  DDDance_internal_models.SegmentDescriptionResponse:
+    properties:
+      dance_id:
+        type: string
+      description:
+        type: string
+      segment_idx:
+        type: integer
+    type: object
+  DDDance_internal_models.SignInInput:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+      user_code:
+        type: string
+    required:
+    - login
+    - password
+    type: object
+  DDDance_internal_models.SignUpInput:
+    properties:
+      login:
+        type: string
+      password:
+        type: string
+    required:
+    - login
+    - password
+    type: object
+  DDDance_internal_models.User:
+    properties:
+      avatar:
+        type: string
+      created_at:
+        type: string
+      has_2fa:
+        type: boolean
+      id:
+        type: string
+      is_foreign:
+        type: boolean
+      login:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+    required:
+    - avatar
+    - has_2fa
+    - id
+    - is_foreign
+    - login
+    - version
+    type: object
+  DDDance_internal_models.VideoItem:
+    properties:
+      id:
+        type: string
+      url:
+        type: string
+    type: object
+host: localhost:5458
+info:
+  contact: {}
+  description: API для авторизации пользователей и получения разбора танца.
+  title: DDDance API
+  version: "1.0"
+paths:
+  /auth/check:
+    get:
+      description: Verify if user is authenticated and return user data
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.User'
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Check authentication status
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: Clear authentication cookie and log out user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: User logout
+      tags:
+      - auth
+  /auth/signin:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user
+      parameters:
+      - description: User data
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/DDDance_internal_models.SignInInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.User'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: User login
+      tags:
+      - auth
+  /auth/signup:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user account
+      parameters:
+      - description: User registration data
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/DDDance_internal_models.SignUpInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.User'
+        "400":
+          description: Bad Request
+        "409":
+          description: Conflict
+        "500":
+          description: Internal Server Error
+      summary: User registration
+      tags:
+      - auth
+  /users/{id}:
+    get:
+      parameters:
+      - description: Genre ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.User'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get user by ID
+      tags:
+      - users
+  /users/dance/{dance_id}/segment/{segment_idx}:
+    get:
+      parameters:
+      - description: Dance ID
+        in: path
+        name: dance_id
+        required: true
+        type: string
+      - description: Segment index
+        in: path
+        name: segment_idx
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.SegmentDescriptionResponse'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get segment description by dance ID and segment index
+      tags:
+      - users
+  /users/dance/{id}:
+    get:
+      parameters:
+      - description: Dance ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.LoadDanceResponse'
+        "400":
+          description: Bad Request
+        "404":
+          description: Not Found
+        "500":
+          description: Internal Server Error
+      summary: Get dance result by ID
+      tags:
+      - users
+  /users/load:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: 'Dance video file (required, max 50MB, formats: mp4, mov)'
+        in: formData
+        name: dance
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.LoadDanceResponse'
+        "400":
+          description: Bad Request
+        "413":
+          description: Request Entity Too Large
+        "500":
+          description: Internal Server Error
+      summary: Load Dance
+      tags:
+      - users
+  /users/loadByURL:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Dance URL and dance_id
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/DDDance_internal_models.LoadDanceByURLInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.LoadDanceResponse'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Load Dance by URL
+      tags:
+      - users
+  /users/main_page:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.MainPageResponse'
+        "500":
+          description: Internal Server Error
+      summary: Get main page videos
+      tags:
+      - users
+  /users/password:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Password data (old_password and new_password are required)
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/DDDance_internal_models.ChangePasswordInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DDDance_internal_models.User'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Change user password
+      tags:
+      - users
+swagger: "2.0"

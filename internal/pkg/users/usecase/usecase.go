@@ -7,10 +7,14 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"time"
+	"strings"
+	
 
 	jwt "github.com/golang-jwt/jwt/v5"
 	uuid "github.com/satori/go.uuid"
@@ -36,14 +40,17 @@ func CheckPass(passHash []byte, plainPassword string) bool {
 }
 
 type UserUsecase struct {
-	secret   string
-	userRepo users.UsersRepo
+	secret      string
+	userRepo    users.UsersRepo
+	storageRepo users.StorageRepo
 }
 
-func NewUserUsecase(userRepo users.UsersRepo) *UserUsecase {
+
+func NewUserUsecase(userRepo users.UsersRepo, storageRepo users.StorageRepo) *UserUsecase {
 	return &UserUsecase{
-		secret:   os.Getenv("JWT_SECRET"),
-		userRepo: userRepo,
+		secret:      os.Getenv("JWT_SECRET"),
+		userRepo:    userRepo,
+		storageRepo: storageRepo,
 	}
 }
 
@@ -162,4 +169,282 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, id uuid.UUID, oldPass
 	}
 
 	return neededUser, token, nil
+}
+
+
+
+
+func (uc *UserUsecase) UploadDance(
+    ctx context.Context, 
+    buffer []byte, 
+    fileFormat string,
+) (*models.UploadDanceResult, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    var danceExtension string
+    switch fileFormat {
+    case "video/mp4":
+        danceExtension = ".mp4"
+    case "video/quicktime":
+        danceExtension = ".mov"
+    default:
+        logger.Error("invalid format of file")
+        return nil, users.ErrorBadRequest
+    }
+
+    dancePath, err := uc.storageRepo.UploadDance(ctx, buffer, fileFormat, danceExtension)
+    if err != nil {
+        logger.Error("failed to upload dance", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    danceID := uuid.NewV4().String() 
+    logger.Info("video uploaded to S3", "path", dancePath, "dance_id", danceID)
+
+    taskID, err := uc.enqueueProcessing(ctx, dancePath, danceID)
+    if err != nil {
+        logger.Error("failed to enqueue processing", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    result, err := uc.waitForProcessing(ctx, taskID, logger)
+    if err != nil {
+        logger.Error("processing failed", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    if result == nil {
+        logger.Error("processing returned nil result")
+        return nil, users.ErrorInternalServerError
+    }
+
+    return &models.UploadDanceResult{
+        DanceID:             result.DanceID,
+		FullGlbKey:          result.FullGlbKey,
+        SegmentsKey:         result.SegmentsKey,
+        GlbKeys:             result.GlbKeys,
+        NumFrames:           result.NumFrames,
+        NumSegments:         result.NumSegments,
+        NumSegmentsRendered: result.NumSegmentsRendered,
+        DurationSec:         result.DurationSec,
+		VideoPath: 		 	 result.VideoPath,
+    }, nil
+}
+
+
+func (uc *UserUsecase) enqueueProcessing(ctx context.Context, videoKey, danceID string) (string, error) {
+	//Кстати обратите внимание, ML_SERVICE_URL=http://ml-service:8000/ml, теперь нужно /ml прописывать, так надо
+    processingURL := os.Getenv("ML_SERVICE_URL") + "/process"
+    requestBody := map[string]string{
+        "video_key": videoKey, 
+        "dance_id":  danceID,
+    }
+
+    jsonBody, _ := json.Marshal(requestBody)
+	client := &http.Client{Timeout: 20 * time.Second}
+
+    resp, err := client.Post(processingURL, "application/json", bytes.NewBuffer(jsonBody))
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+
+    var response struct {
+        TaskID string `json:"task_id"`
+    }
+    json.NewDecoder(resp.Body).Decode(&response)
+    return response.TaskID, nil
+}
+
+
+func (uc *UserUsecase) waitForProcessing(ctx context.Context, taskID string, logger *slog.Logger) (*models.ProcessingResult, error) {
+    statusURL := os.Getenv("ML_SERVICE_URL") + "/status/" + taskID
+
+    // Таймаут всей операции — 10 минут
+    deadline := time.Now().Add(10 * time.Minute)
+    client := &http.Client{Timeout: 10 * time.Second}
+
+    for time.Now().Before(deadline) {
+        time.Sleep(5 * time.Second)
+
+        resp, err := client.Get(statusURL)
+        if err != nil {
+            logger.Warn("status check failed", "error", err)
+            continue
+        }
+
+        var status struct {
+            Status string           `json:"status"`
+            Result *models.ProcessingResult `json:"result,omitempty"`
+        }
+        json.NewDecoder(resp.Body).Decode(&status)
+        resp.Body.Close()
+
+        logger.Info("processing status", "status", status.Status)
+
+        switch status.Status {
+        case "done":
+            return status.Result, nil
+        case "failed":
+            return nil, fmt.Errorf("processing failed")
+        }
+    }
+
+    return nil, fmt.Errorf("processing timeout")
+}
+
+func (uc *UserUsecase) UploadDanceByURL(
+    ctx context.Context,
+    videoURL string,
+) (*models.UploadDanceResult, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    danceID := uuid.NewV4().String()
+    
+
+    taskID, err := uc.enqueueProcessingByURL(ctx, videoURL, danceID)
+    if err != nil {
+        logger.Error("failed to enqueue processing", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    result, err := uc.waitForProcessing(ctx, taskID, logger)
+    if err != nil {
+        logger.Error("processing failed", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    if result == nil {
+        logger.Error("processing returned nil result")
+        return nil, users.ErrorInternalServerError
+    }
+
+    return &models.UploadDanceResult{
+        DanceID:             result.DanceID,
+        FullGlbKey:          result.FullGlbKey,
+		VideoPath:			 result.VideoPath,
+        SegmentsKey:         result.SegmentsKey,
+        GlbKeys:             result.GlbKeys,
+        NumFrames:           result.NumFrames,
+        NumSegments:         result.NumSegments,
+        NumSegmentsRendered: result.NumSegmentsRendered,
+        DurationSec:         result.DurationSec,
+    }, nil
+}
+
+func (uc *UserUsecase) enqueueProcessingByURL(ctx context.Context, videoURL, danceID string) (string, error) {
+    processingURL := os.Getenv("ML_SERVICE_URL") + "/process-url"
+    requestBody := map[string]string{
+        "url":      videoURL,
+		"dance_id": danceID,
+    }
+
+    jsonBody, _ := json.Marshal(requestBody)
+    client := &http.Client{Timeout: 20 * time.Second}
+
+    resp, err := client.Post(processingURL, "application/json", bytes.NewBuffer(jsonBody))
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+
+    var response struct {
+        TaskID string `json:"task_id"`
+    }
+    json.NewDecoder(resp.Body).Decode(&response)
+    return response.TaskID, nil
+}
+
+func (uc *UserUsecase) GetDanceByID(ctx context.Context, danceID string) (*models.UploadDanceResult, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    segmentsKey := fmt.Sprintf("results/%s/segments.json", danceID)
+    
+    data, err := uc.storageRepo.DownloadFile(ctx, segmentsKey)
+    if err != nil {
+        logger.Error("failed to get segments.json", "error", err)
+        return nil, users.ErrorNotFound
+    }
+
+    var segments struct {
+        DanceID     string `json:"dance_id"`
+        NumSegments int    `json:"num_segments"`
+        Meta        struct {
+            NumFrames   int     `json:"num_frames"`
+            DurationSec float64 `json:"duration_sec"`
+        } `json:"meta"`
+    }
+    if err := json.Unmarshal(data, &segments); err != nil {
+        logger.Error("failed to parse segments.json", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    glbKeys := make([]string, segments.NumSegments)
+    for i := 0; i < segments.NumSegments; i++ {
+        glbKeys[i] = fmt.Sprintf("results/%s/segment_%d.glb", danceID, i)
+    }
+
+    return &models.UploadDanceResult{
+        DanceID:             danceID,
+        SegmentsKey:         segmentsKey,
+        FullGlbKey:          fmt.Sprintf("results/%s/full_animation.glb", danceID),
+        GlbKeys:             glbKeys,
+        NumFrames:           segments.Meta.NumFrames,
+        NumSegments:         segments.NumSegments,
+        NumSegmentsRendered: segments.NumSegments,
+        DurationSec:         segments.Meta.DurationSec,
+        VideoPath:           fmt.Sprintf("results/%s/video.mp4", danceID),
+    }, nil
+}
+
+func (uc *UserUsecase) GetMainPage(ctx context.Context) ([]models.VideoItem, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    danceIDs, err := uc.storageRepo.ListDances(ctx, 9)
+    if err != nil {
+        logger.Error("failed to list dances", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    s3Address := os.Getenv("S3_ADDRESS")
+    s3Address = strings.TrimRight(s3Address, "/")
+
+    var videos []models.VideoItem
+    for _, id := range danceIDs {
+        videos = append(videos, models.VideoItem{
+            ID:  id,
+            URL: fmt.Sprintf("%s/results/%s/video.mp4", s3Address, id),
+        })
+    }
+
+    return videos, nil
+}
+
+func (uc *UserUsecase) GetSegmentDescription(ctx context.Context, danceID string, segmentIdx int) (*models.SegmentDescriptionResult, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    mlURL := fmt.Sprintf("%s/segment_description/%s/%d", os.Getenv("ML_SERVICE_URL"), danceID, segmentIdx)
+    client := &http.Client{Timeout: 10 * time.Second}
+
+    resp, err := client.Get(mlURL)
+    if err != nil {
+        logger.Error("failed to call ml service", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode == http.StatusNotFound {
+        return nil, users.ErrorNotFound
+    }
+    if resp.StatusCode != http.StatusOK {
+        return nil, users.ErrorInternalServerError
+    }
+
+    var result models.SegmentDescriptionResult
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        logger.Error("failed to decode response", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    return &result, nil
 }

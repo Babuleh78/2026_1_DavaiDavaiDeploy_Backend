@@ -9,11 +9,16 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
 	"time"
-
+	"os/exec"
+	"fmt"
+	"bytes"
+	"strconv"
+	
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc/codes"
@@ -256,4 +261,360 @@ func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-CSRF-Token", user.CSRFToken)
 	helpers.WriteJSON(w, response)
 	log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// LoadDance godoc
+// @Summary Load Dance
+// @Tags users
+// @Accept multipart/form-data
+// @Produce json
+// @Param dance formData file true "Dance video file (required, max 50MB, formats: mp4, mov)"
+// @Success 200 {object} models.LoadDanceResponse
+// @Failure 400
+// @Failure 413
+// @Failure 500
+// @Router /users/load [post]
+func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+	const maxRequestBodySize = 60 * 1024 * 1024
+	limitedReader := http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+	defer func() {
+		_ = limitedReader.Close()
+	}()
+	newReq := *r
+	newReq.Body = limitedReader
+
+	err := newReq.ParseMultipartForm(maxRequestBodySize)
+	if err != nil {
+		if errors.As(err, new(*http.MaxBytesError)) {
+			log.LogHandlerError(logger, errors.New("file is too large"), http.StatusRequestEntityTooLarge)
+			helpers.WriteError(w, http.StatusRequestEntityTooLarge)
+			return
+		}
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+	defer func() {
+		if newReq.MultipartForm != nil {
+			_ = newReq.MultipartForm.RemoveAll()
+		}
+	}()
+
+	file, _, err := newReq.FormFile("dance")
+	if err != nil {
+		log.LogHandlerError(logger, errors.New("failed to read file"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+	defer func() {
+		_ = file.Close()
+	}()
+
+	buffer, err := io.ReadAll(file)
+	if err != nil {
+		log.LogHandlerError(logger, errors.New("failed to read file"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	buffer, err = convertToH264(buffer)
+	if err != nil {
+		log.LogHandlerError(logger, fmt.Errorf("failed to convert video: %w", err), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	danceResult, err := u.client.LoadDance(r.Context(), &gen.LoadDanceRequest{
+		Dance:      buffer,
+		FileFormat: "video/mp4",
+	})
+	if err != nil {
+		st, _ := status.FromError(err)
+		switch st.Code() {
+		case codes.InvalidArgument:
+			helpers.WriteError(w, http.StatusBadRequest)
+		case codes.NotFound:
+			helpers.WriteError(w, http.StatusNotFound)
+		default:
+			helpers.WriteError(w, http.StatusInternalServerError)
+		}
+		return
+	}
+
+	response := models.LoadDanceResponse{
+		DanceID:             danceResult.DanceID,
+		FullGlbKey:          danceResult.FullGlbKey,
+		GlbKeys:             danceResult.GlbKeys,
+		SegmentsKey:         danceResult.SegmentsKey,
+		NumFrames:           int(danceResult.NumFrames),
+		NumSegments:         int(danceResult.NumSegments),
+		DurationSec:         danceResult.DurationSec,
+		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
+		VideoPath:			 danceResult.VideoPath,
+	}
+
+	response.Sanitize()
+
+	helpers.WriteJSON(w, response)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+func convertToH264(input []byte) ([]byte, error) {
+	
+	tmpDir := "/dddance-back/tmp"
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		tmpDir = "."
+	}
+
+	tmpIn, err := os.CreateTemp(tmpDir, "dance-input-*.mp4")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp input file: %w", err)
+	}
+	defer os.Remove(tmpIn.Name())
+	defer tmpIn.Close()
+
+	if _, err := tmpIn.Write(input); err != nil {
+		return nil, fmt.Errorf("failed to write temp input file: %w", err)
+	}
+	tmpIn.Close()
+
+	tmpOut, err := os.CreateTemp(tmpDir, "dance-output-*.mp4")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp output file: %w", err)
+	}
+	defer os.Remove(tmpOut.Name())
+	tmpOut.Close()
+
+	cmd := exec.Command("ffmpeg",
+		"-y",
+		"-i", tmpIn.Name(),
+		"-c:v", "libx264",
+		"-preset", "fast",
+		"-crf", "23",
+		"-c:a", "aac",
+		"-movflags", "+faststart",
+		"-f", "mp4",
+		tmpOut.Name(),
+	)
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("ffmpeg failed: %w, stderr: %s", err, stderr.String())
+	}
+
+	result, err := os.ReadFile(tmpOut.Name())
+	if err != nil {
+		return nil, fmt.Errorf("failed to read output file: %w", err)
+	}
+
+	return result, nil
+}
+
+
+// LoadDanceByURL godoc
+// @Summary Load Dance by URL
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param input body models.LoadDanceByURLInput true "Dance URL and dance_id"
+// @Success 200 {object} models.LoadDanceResponse
+// @Failure 400
+// @Failure 500
+// @Router /users/loadByURL [post]
+func (u *UserHandler) LoadDanceByURL(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    var req models.LoadDanceByURLInput
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        log.LogHandlerError(logger, fmt.Errorf("invalid request body: %w", err), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+    req.Sanitize()
+
+    if req.URL == "" {
+        log.LogHandlerError(logger, errors.New("url is required"), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    danceResult, err := u.client.LoadDanceByURL(r.Context(), &gen.LoadDanceByURLRequest{
+        Url:     req.URL,
+    })
+    if err != nil {
+        st, _ := status.FromError(err)
+        switch st.Code() {
+        case codes.InvalidArgument:
+            helpers.WriteError(w, http.StatusBadRequest)
+        case codes.NotFound:
+            helpers.WriteError(w, http.StatusNotFound)
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
+
+    response := models.LoadDanceResponse{
+        DanceID:             danceResult.DanceID,
+        FullGlbKey:          danceResult.FullGlbKey,
+        GlbKeys:             danceResult.GlbKeys,
+        SegmentsKey:         danceResult.SegmentsKey,
+        NumFrames:           int(danceResult.NumFrames),
+        NumSegments:         int(danceResult.NumSegments),
+        DurationSec:         danceResult.DurationSec,
+        NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
+    }
+    response.Sanitize()
+
+    helpers.WriteJSON(w, response)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// GetDanceByID godoc
+// @Summary Get dance result by ID
+// @Tags users
+// @Produce json
+// @Param id path string true "Dance ID"
+// @Success 200 {object} models.LoadDanceResponse
+// @Failure 400
+// @Failure 404
+// @Failure 500
+// @Router /users/dance/{id} [get]
+func (u *UserHandler) GetDanceByID(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    vars := mux.Vars(r)
+    danceID := vars["id"]
+    if danceID == "" {
+        log.LogHandlerError(logger, errors.New("dance id is required"), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    danceResult, err := u.client.GetDanceByID(r.Context(), &gen.GetDanceByIDRequest{
+        DanceId: danceID,
+    })
+    if err != nil {
+        st, _ := status.FromError(err)
+        switch st.Code() {
+        case codes.NotFound:
+            helpers.WriteError(w, http.StatusNotFound)
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
+
+    response := models.LoadDanceResponse{
+		DanceID:             danceResult.DanceID,
+		FullGlbKey:          danceResult.FullGlbKey,
+		GlbKeys:             danceResult.GlbKeys,
+		SegmentsKey:         danceResult.SegmentsKey,
+		NumFrames:           int(danceResult.NumFrames),
+		NumSegments:         int(danceResult.NumSegments),
+		DurationSec:         danceResult.DurationSec,
+		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
+		VideoPath:           danceResult.VideoPath,
+	}
+    response.Sanitize()
+
+    helpers.WriteJSON(w, response)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// GetMainPage godoc
+// @Summary Get main page videos
+// @Tags users
+// @Produce json
+// @Success 200 {object} models.MainPageResponse
+// @Failure 500
+// @Router /users/main_page [get]
+func (u *UserHandler) GetMainPage(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    result, err := u.client.GetMainPage(r.Context(), &gen.GetMainPageRequest{})
+    if err != nil {
+        st, _ := status.FromError(err)
+        switch st.Code() {
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
+
+    var videos []models.VideoItem
+    for _, v := range result.Videos {
+        videos = append(videos, models.VideoItem{
+            ID:  v.ID,
+            URL: v.URL,
+        })
+    }
+
+    response := models.MainPageResponse{
+        Count:  int(result.Count),
+        Videos: videos,
+    }
+
+    helpers.WriteJSON(w, response)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+
+// GetSegmentDescription godoc
+// @Summary Get segment description by dance ID and segment index
+// @Tags users
+// @Produce json
+// @Param dance_id path string true "Dance ID"
+// @Param segment_idx path int true "Segment index"
+// @Success 200 {object} models.SegmentDescriptionResponse
+// @Failure 400
+// @Failure 404
+// @Failure 500
+// @Router /users/dance/{dance_id}/segment/{segment_idx} [get]
+func (u *UserHandler) GetSegmentDescription(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    vars := mux.Vars(r)
+    danceID := vars["dance_id"]
+    segmentIdxStr := vars["segment_idx"]
+
+    if danceID == "" || segmentIdxStr == "" {
+        log.LogHandlerError(logger, errors.New("dance_id and segment_idx are required"), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    segmentIdx, err := strconv.Atoi(segmentIdxStr)
+    if err != nil || segmentIdx < 0 {
+        log.LogHandlerError(logger, errors.New("invalid segment_idx"), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    result, err := u.client.GetSegmentDescription(r.Context(), &gen.GetSegmentDescriptionRequest{
+        DanceId:    danceID,
+        SegmentIdx: int32(segmentIdx),
+    })
+    if err != nil {
+        st, _ := status.FromError(err)
+        switch st.Code() {
+        case codes.NotFound:
+            helpers.WriteError(w, http.StatusNotFound)
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
+
+    response := models.SegmentDescriptionResponse{
+        DanceID:     result.DanceId,
+        SegmentIdx:  int(result.SegmentIdx),
+        Description: result.Description,
+    }
+
+    helpers.WriteJSON(w, response)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
 }

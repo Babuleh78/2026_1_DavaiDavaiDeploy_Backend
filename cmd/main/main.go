@@ -1,6 +1,6 @@
-// @title           Kinopoisk API
+// @title           DDDance API
 // @version         1.0
-// @description     API для авторизации пользователей и получения фильмов/жанров/актеров.
+// @description     API для авторизации пользователей и получения разбора танца.
 // @host            localhost:5458
 // @BasePath        /api
 package main
@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "DDDance/docs"
 
 	authHandlers "DDDance/internal/pkg/auth/delivery/http"
 	authRepo "DDDance/internal/pkg/auth/repo"
@@ -25,6 +26,7 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/joho/godotenv"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"google.golang.org/grpc"
 
 	"github.com/gorilla/mux"
@@ -84,6 +86,7 @@ func main() {
 	ddLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	mainRouter := mux.NewRouter()
+	mainRouter.PathPrefix("/swagger/").Handler(httpSwagger.WrapHandler)
 
 	apiRouter := mainRouter.PathPrefix("/api").Subrouter()
 	apiRouter.NotFoundHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -104,19 +107,23 @@ func main() {
 	protectedAuthRouter.HandleFunc("/logout", authHandler.LogOutUser).Methods(http.MethodPost, http.MethodOptions)
 
 	userRouter := apiRouter.PathPrefix("/users").Subrouter()
-
+	userRouter.HandleFunc("/load", userHandler.LoadDance).Methods(http.MethodPost)
+	userRouter.HandleFunc("/loadByURL", userHandler.LoadDanceByURL).Methods(http.MethodPost)
+	userRouter.HandleFunc("/dance/{id}", userHandler.GetDanceByID).Methods(http.MethodGet, http.MethodOptions)
+	userRouter.HandleFunc("/main_page", userHandler.GetMainPage).Methods(http.MethodGet, http.MethodOptions)
+	userRouter.HandleFunc("/dance/{dance_id}/segment/{segment_idx}", userHandler.GetSegmentDescription).Methods(http.MethodGet, http.MethodOptions)
 	// Protected user routes
 	protectedUserRouter := userRouter.PathPrefix("").Subrouter()
 	protectedUserRouter.Use(userHandler.Middleware)
 	protectedUserRouter.HandleFunc("/change/password", userHandler.ChangePassword).Methods(http.MethodPut, http.MethodOptions)
-
-	userRouter.HandleFunc("/{id}", userHandler.GetUser).Methods(http.MethodGet)
 
 	danceSrv := http.Server{
 		Handler: mainRouter,
 		Addr:    ":5458",
 	}
 
+	
+	
 	go func() {
 		log.Println("Starting main server on port 5458!")
 		err := danceSrv.ListenAndServe()
