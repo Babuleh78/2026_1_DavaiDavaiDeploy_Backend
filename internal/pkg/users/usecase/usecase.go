@@ -424,7 +424,7 @@ func (uc *UserUsecase) GetSegmentDescription(ctx context.Context, danceID string
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
     mlURL := fmt.Sprintf("%s/segment_description/%s/%d", os.Getenv("ML_SERVICE_URL"), danceID, segmentIdx)
-    client := &http.Client{Timeout: 10 * time.Second}
+    client := &http.Client{Timeout: 100 * time.Second}
 
     resp, err := client.Get(mlURL)
     if err != nil {
