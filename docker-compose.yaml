@@ -31,8 +31,6 @@ services:
     restart: unless-stopped
     ports:
       - "${MAIN_PORT:-5458}:5458"
-    env_file:
-      - .env
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_NAME: ${DB_NAME:-DDDance}
@@ -41,6 +39,15 @@ services:
       DB_PORT: ${DB_PORT:-5432}
       AUTH_SERVICE_HOST: ${AUTH_SERVICE_HOST:-auth}
       AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT:-5459}
+      JWT_SECRET: ${JWT_SECRET:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-}
+      S3_ADDRESS: ${S3_ADDRESS:-}
+      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-dddance}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      ML_SERVICE_URL: ${ML_SERVICE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,14 +62,15 @@ services:
     restart: unless-stopped
     ports:
       - "${AUTH_PORT:-5459}:5459"
-    env_file:
-      - .env
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_NAME: ${DB_NAME:-DDDance}
       DB_USER: ${DB_USER:-postgres}
       DB_PASSWORD: ${DB_PASSWORD:-postgres123}
       DB_PORT: ${DB_PORT:-5432}
+      JWT_SECRET: ${JWT_SECRET:-}
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
+      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-}
     depends_on:
       postgres:
         condition: service_healthy
