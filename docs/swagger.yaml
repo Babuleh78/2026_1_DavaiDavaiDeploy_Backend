@@ -1,6 +1,6 @@
 basePath: /api
 definitions:
-  DDDance_internal_models.ChangePasswordInput:
+  models.ChangePasswordInput:
     properties:
       new_password:
         type: string
@@ -10,12 +10,12 @@ definitions:
     - new_password
     - old_password
     type: object
-  DDDance_internal_models.LoadDanceByURLInput:
+  models.LoadDanceByURLInput:
     properties:
       url:
         type: string
     type: object
-  DDDance_internal_models.LoadDanceResponse:
+  models.LoadDanceResponse:
     properties:
       dance_id:
         type: string
@@ -48,16 +48,31 @@ definitions:
     - segments_key
     - video_path
     type: object
-  DDDance_internal_models.MainPageResponse:
+  models.MainPageResponse:
     properties:
       count:
         type: integer
       videos:
         items:
-          $ref: '#/definitions/DDDance_internal_models.VideoItem'
+          $ref: '#/definitions/models.VideoItem'
         type: array
     type: object
-  DDDance_internal_models.SegmentDescriptionResponse:
+  models.SearchHistoryItem:
+    properties:
+      created_at:
+        type: string
+      dance_id:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      source_url:
+        type: string
+      user_id:
+        type: string
+    type: object
+  models.SegmentDescriptionResponse:
     properties:
       dance_id:
         type: string
@@ -66,7 +81,7 @@ definitions:
       segment_idx:
         type: integer
     type: object
-  DDDance_internal_models.SignInInput:
+  models.SignInInput:
     properties:
       login:
         type: string
@@ -78,7 +93,7 @@ definitions:
     - login
     - password
     type: object
-  DDDance_internal_models.SignUpInput:
+  models.SignUpInput:
     properties:
       login:
         type: string
@@ -88,7 +103,12 @@ definitions:
     - login
     - password
     type: object
-  DDDance_internal_models.User:
+  models.UpdateHistoryNameInput:
+    properties:
+      name:
+        type: string
+    type: object
+  models.User:
     properties:
       avatar:
         type: string
@@ -114,7 +134,7 @@ definitions:
     - login
     - version
     type: object
-  DDDance_internal_models.VideoItem:
+  models.VideoItem:
     properties:
       id:
         type: string
@@ -137,7 +157,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DDDance_internal_models.User'
+            $ref: '#/definitions/models.User'
         "401":
           description: Unauthorized
         "500":
@@ -175,14 +195,14 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/DDDance_internal_models.SignInInput'
+          $ref: '#/definitions/models.SignInInput'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DDDance_internal_models.User'
+            $ref: '#/definitions/models.User'
         "400":
           description: Bad Request
         "401":
@@ -203,14 +223,14 @@ paths:
         name: input
         required: true
         schema:
-          $ref: '#/definitions/DDDance_internal_models.SignUpInput'
+          $ref: '#/definitions/models.SignUpInput'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DDDance_internal_models.User'
+            $ref: '#/definitions/models.User'
         "400":
           description: Bad Request
         "409":
@@ -222,87 +242,250 @@ paths:
       - auth
   /users/{id}:
     get:
+      description: Возвращает публичные данные пользователя (ID, версию, логин, аватар)
       parameters:
-      - description: Genre ID
+      - description: UUID пользователя
         in: path
         name: id
         required: true
         type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: Неверный формат ID
+          schema:
+            type: string
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            type: string
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Получить информацию о пользователе по ID
+      tags:
+      - users
+  /users/change/password:
+    put:
+      consumes:
+      - application/json
+      description: Изменяет пароль, возвращает обновлённый JWT и CSRF-токен в куках
+        и заголовке X-CSRF-Token
+      parameters:
+      - description: Старый и новый пароль
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.ChangePasswordInput'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DDDance_internal_models.User'
+            $ref: '#/definitions/models.User'
         "400":
-          description: Bad Request
+          description: Неверный запрос
+          schema:
+            type: string
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            type: string
         "404":
-          description: Not Found
+          description: Пользователь не найден
+          schema:
+            type: string
         "500":
-          description: Internal Server Error
-      summary: Get user by ID
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Изменить пароль текущего пользователя
       tags:
       - users
   /users/dance/{dance_id}/segment/{segment_idx}:
     get:
+      description: Возвращает описание для указанного сегмента танца
       parameters:
-      - description: Dance ID
+      - description: ID танца
         in: path
         name: dance_id
         required: true
         type: string
-      - description: Segment index
+      - description: Индекс сегмента (начиная с 0)
         in: path
         name: segment_idx
         required: true
         type: integer
-      produces:
-      - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DDDance_internal_models.SegmentDescriptionResponse'
+            $ref: '#/definitions/models.SegmentDescriptionResponse'
         "400":
-          description: Bad Request
+          description: Неверные параметры запроса
+          schema:
+            type: string
         "404":
-          description: Not Found
+          description: Танец или сегмент не найден
+          schema:
+            type: string
         "500":
-          description: Internal Server Error
-      summary: Get segment description by dance ID and segment index
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - OptionalAuth: []
+      summary: Получить текстовое описание сегмента танца
       tags:
-      - users
+      - dances
   /users/dance/{id}:
     get:
+      description: Возвращает метаданные обработанного танца
       parameters:
-      - description: Dance ID
+      - description: ID танца
         in: path
         name: id
         required: true
         type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LoadDanceResponse'
+        "400":
+          description: Не указан ID танца
+          schema:
+            type: string
+        "404":
+          description: Танец не найден
+          schema:
+            type: string
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - OptionalAuth: []
+      summary: Получить информацию о танце по ID
+      tags:
+      - dances
+  /users/history:
+    get:
+      description: Возвращает список ранее загруженных или просмотренных танцев текущего
+        пользователя
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DDDance_internal_models.LoadDanceResponse'
-        "400":
-          description: Bad Request
-        "404":
-          description: Not Found
+            items:
+              $ref: '#/definitions/models.SearchHistoryItem'
+            type: array
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            type: string
         "500":
-          description: Internal Server Error
-      summary: Get dance result by ID
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: История поиска пользователя
+      tags:
+      - users
+  /users/history/{history_id}:
+    delete:
+      description: Удаляет запись истории по её ID, принадлежащую текущему пользователю
+      parameters:
+      - description: UUID записи истории
+        in: path
+        name: history_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Запись успешно удалена
+        "400":
+          description: Неверный ID записи
+          schema:
+            type: string
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            type: string
+        "404":
+          description: Запись не найдена
+          schema:
+            type: string
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Удалить запись из истории поиска
+      tags:
+      - users
+    put:
+      consumes:
+      - application/json
+      description: Изменяет пользовательское название для указанной записи истории
+      parameters:
+      - description: UUID записи истории
+        in: path
+        name: history_id
+        required: true
+        type: string
+      - description: Новое название
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.UpdateHistoryNameInput'
+      responses:
+        "204":
+          description: Название успешно обновлено
+        "400":
+          description: Неверный ID записи или тело запроса
+          schema:
+            type: string
+        "401":
+          description: Пользователь не авторизован
+          schema:
+            type: string
+        "404":
+          description: Запись не найдена
+          schema:
+            type: string
+        "500":
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Обновить название записи в истории
       tags:
       - users
   /users/load:
     post:
       consumes:
       - multipart/form-data
+      description: Принимает видеофайл через multipart/form-data, конвертирует в H.264
+        и отправляет на анализ
       parameters:
-      - description: 'Dance video file (required, max 50MB, formats: mp4, mov)'
+      - description: Видеофайл (до 60 МБ)
         in: formData
         name: dance
         required: true
@@ -313,80 +496,77 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DDDance_internal_models.LoadDanceResponse'
+            $ref: '#/definitions/models.LoadDanceResponse'
         "400":
-          description: Bad Request
+          description: Ошибка чтения файла или неверный запрос
+          schema:
+            type: string
         "413":
-          description: Request Entity Too Large
+          description: Файл слишком большой
+          schema:
+            type: string
         "500":
-          description: Internal Server Error
-      summary: Load Dance
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - OptionalAuth: []
+      summary: Загрузить видео танца и обработать его
       tags:
-      - users
+      - dances
   /users/loadByURL:
     post:
       consumes:
       - application/json
+      description: Принимает JSON с URL, скачивает видео и обрабатывает его
       parameters:
-      - description: Dance URL and dance_id
+      - description: URL видео
         in: body
-        name: input
+        name: request
         required: true
         schema:
-          $ref: '#/definitions/DDDance_internal_models.LoadDanceByURLInput'
+          $ref: '#/definitions/models.LoadDanceByURLInput'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DDDance_internal_models.LoadDanceResponse'
+            $ref: '#/definitions/models.LoadDanceResponse'
         "400":
-          description: Bad Request
+          description: Неверный запрос или отсутствует URL
+          schema:
+            type: string
+        "404":
+          description: Видео не найдено
+          schema:
+            type: string
         "500":
-          description: Internal Server Error
-      summary: Load Dance by URL
+          description: Внутренняя ошибка сервера
+          schema:
+            type: string
+      security:
+      - OptionalAuth: []
+      summary: Загрузить танец по URL видео
       tags:
-      - users
+      - dances
   /users/main_page:
     get:
+      description: Возвращает массив танцев (возможно, популярных или недавних)
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/DDDance_internal_models.MainPageResponse'
+            $ref: '#/definitions/models.MainPageResponse'
         "500":
-          description: Internal Server Error
-      summary: Get main page videos
-      tags:
-      - users
-  /users/password:
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: Password data (old_password and new_password are required)
-        in: body
-        name: input
-        required: true
-        schema:
-          $ref: '#/definitions/DDDance_internal_models.ChangePasswordInput'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
+          description: Внутренняя ошибка сервера
           schema:
-            $ref: '#/definitions/DDDance_internal_models.User'
-        "400":
-          description: Bad Request
-        "401":
-          description: Unauthorized
-        "500":
-          description: Internal Server Error
-      summary: Change user password
+            type: string
+      security:
+      - OptionalAuth: []
+      summary: Получить список танцев для главной страницы
       tags:
-      - users
+      - dances
 swagger: "2.0"

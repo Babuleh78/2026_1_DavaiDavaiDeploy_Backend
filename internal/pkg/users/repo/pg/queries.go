@@ -10,3 +10,15 @@ var GetUserByLoginQuery string
 
 //go:embed sql/updateUserPasswordQuery.sql
 var UpdateUserPasswordQuery string
+
+//go:embed sql/addToHistoryQuery.sql
+var AddToHistoryQuery string
+
+//go:embed sql/getHistoryQuery.sql
+var GetHistoryQuery string
+
+//go:embed sql/deleteFromHistoryQuery.sql
+var DeleteFromHistoryQuery string
+
+//go:embed sql/updateHistoryNameQuery.sql
+var UpdateHistoryNameQuery string

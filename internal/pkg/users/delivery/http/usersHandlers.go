@@ -6,19 +6,19 @@ import (
 	"DDDance/internal/pkg/helpers"
 	"DDDance/internal/pkg/users"
 	"DDDance/internal/pkg/utils/log"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
-	"time"
 	"os/exec"
-	"fmt"
-	"bytes"
 	"strconv"
-	
+	"time"
+
 	"github.com/gorilla/mux"
 	uuid "github.com/satori/go.uuid"
 	"google.golang.org/grpc/codes"
@@ -32,11 +32,12 @@ const (
 
 type UserHandler struct {
 	client         gen.AuthClient
+	uc             users.UsersUsecase
 	cookieSecure   bool
 	cookieSamesite http.SameSite
 }
 
-func NewUserHandler(client gen.AuthClient) *UserHandler {
+func NewUserHandler(client gen.AuthClient, uc users.UsersUsecase) *UserHandler {
 	secure := false
 	cookieValue := os.Getenv("COOKIE_SECURE")
 	if cookieValue == "true" {
@@ -50,6 +51,7 @@ func NewUserHandler(client gen.AuthClient) *UserHandler {
 	}
 	return &UserHandler{
 		client:         client,
+		uc:             uc,
 		cookieSecure:   secure,
 		cookieSamesite: samesite,
 	}
@@ -78,7 +80,7 @@ func (u *UserHandler) JWTMiddleware(next http.Handler) http.Handler {
 		neededUser := models.User{
 			ID: uuid.FromStringOrNil(user.ID),
 		}
-		ctx := context.WithValue(r.Context(), users.UserKey, neededUser.ID)
+		ctx := context.WithValue(r.Context(), users.UserKey, neededUser)
 
 		log.LogHandlerInfo(logger, "success", http.StatusOK)
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -134,7 +136,7 @@ func (u *UserHandler) Middleware(next http.Handler) http.Handler {
 		neededUser := models.User{
 			ID: uuid.FromStringOrNil(user.ID),
 		}
-		ctx := context.WithValue(r.Context(), users.UserKey, neededUser.ID)
+		ctx := context.WithValue(r.Context(), users.UserKey, neededUser)
 
 		log.LogHandlerInfo(logger, "success", http.StatusOK)
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -142,15 +144,16 @@ func (u *UserHandler) Middleware(next http.Handler) http.Handler {
 }
 
 // GetUser godoc
-// @Summary Get user by ID
-// @Tags users
-// @Produce json
-// @Param        id   path      string  true  "Genre ID"
-// @Success 200 {object} models.User
-// @Failure 400
-// @Failure 404
-// @Failure 500
-// @Router /users/{id} [get]
+// @Summary      Получить информацию о пользователе по ID
+// @Description  Возвращает публичные данные пользователя (ID, версию, логин, аватар)
+// @Tags         users
+// @Security     ApiKeyAuth
+// @Param        id   path      string  true  "UUID пользователя"
+// @Success      200  {object}  models.User
+// @Failure      400  {string}  string  "Неверный формат ID"
+// @Failure      401  {string}  string  "Пользователь не авторизован"
+// @Failure      500  {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/{id} [get]
 func (u *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 	vars := mux.Vars(r)
@@ -185,16 +188,19 @@ func (u *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 }
 
 // ChangePassword godoc
-// @Summary Change user password
-// @Tags users
-// @Accept json
-// @Produce json
-// @Param input body models.ChangePasswordInput true "Password data (old_password and new_password are required)"
-// @Success 200 {object} models.User
-// @Failure 400
-// @Failure 401
-// @Failure 500
-// @Router /users/password [put]
+// @Summary      Изменить пароль текущего пользователя
+// @Description  Изменяет пароль, возвращает обновлённый JWT и CSRF-токен в куках и заголовке X-CSRF-Token
+// @Tags         users
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      models.ChangePasswordInput  true  "Старый и новый пароль"
+// @Success      200      {object}  models.User
+// @Failure      400      {string}  string  "Неверный запрос"
+// @Failure      401      {string}  string  "Пользователь не авторизован"
+// @Failure      404      {string}  string  "Пользователь не найден"
+// @Failure      500      {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/change/password [put]
 func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 	userID, ok := r.Context().Value(users.UserKey).(uuid.UUID)
@@ -264,16 +270,18 @@ func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 }
 
 // LoadDance godoc
-// @Summary Load Dance
-// @Tags users
-// @Accept multipart/form-data
-// @Produce json
-// @Param dance formData file true "Dance video file (required, max 50MB, formats: mp4, mov)"
-// @Success 200 {object} models.LoadDanceResponse
-// @Failure 400
-// @Failure 413
-// @Failure 500
-// @Router /users/load [post]
+// @Summary      Загрузить видео танца и обработать его
+// @Description  Принимает видеофайл через multipart/form-data, конвертирует в H.264 и отправляет на анализ
+// @Tags         dances
+// @Security     OptionalAuth
+// @Accept       multipart/form-data
+// @Produce      json
+// @Param        dance  formData  file  true  "Видеофайл (до 60 МБ)"
+// @Success      200    {object}  models.LoadDanceResponse
+// @Failure      400    {string}  string  "Ошибка чтения файла или неверный запрос"
+// @Failure      413    {string}  string  "Файл слишком большой"
+// @Failure      500    {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/load [post]
 func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 
@@ -325,16 +333,131 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	danceResult, err := u.client.LoadDance(r.Context(), &gen.LoadDanceRequest{
-		Dance:      buffer,
-		FileFormat: "video/mp4",
-	})
+	danceResult, err := u.uc.UploadDance(r.Context(), buffer, "video/mp4")
 	if err != nil {
-		st, _ := status.FromError(err)
-		switch st.Code() {
-		case codes.InvalidArgument:
+		switch err {
+		case users.ErrorBadRequest:
 			helpers.WriteError(w, http.StatusBadRequest)
-		case codes.NotFound:
+		case users.ErrorNotFound:
+			helpers.WriteError(w, http.StatusNotFound)
+		default:
+			helpers.WriteError(w, http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if user := getUserFromContext(r.Context()); user != nil {
+		_ = u.uc.AddToHistory(r.Context(), user.ID, danceResult.DanceID, "")
+	}
+
+	response := models.LoadDanceResponse{
+		DanceID:             danceResult.DanceID,
+		FullGlbKey:          danceResult.FullGlbKey,
+		GlbKeys:             danceResult.GlbKeys,
+		SegmentsKey:         danceResult.SegmentsKey,
+		NumFrames:           int(danceResult.NumFrames),
+		NumSegments:         int(danceResult.NumSegments),
+		DurationSec:         danceResult.DurationSec,
+		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
+		VideoPath:           danceResult.VideoPath,
+	}
+
+	response.Sanitize()
+
+	helpers.WriteJSON(w, response)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// LoadDanceByURL godoc
+// @Summary      Загрузить танец по URL видео
+// @Description  Принимает JSON с URL, скачивает видео и обрабатывает его
+// @Tags         dances
+// @Security     OptionalAuth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      models.LoadDanceByURLInput  true  "URL видео"
+// @Success      200      {object}  models.LoadDanceResponse
+// @Failure      400      {string}  string  "Неверный запрос или отсутствует URL"
+// @Failure      404      {string}  string  "Видео не найдено"
+// @Failure      500      {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/loadByURL [post]
+func (u *UserHandler) LoadDanceByURL(w http.ResponseWriter, r *http.Request) {
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+	var req models.LoadDanceByURLInput
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.LogHandlerError(logger, fmt.Errorf("invalid request body: %w", err), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+	req.Sanitize()
+
+	if req.URL == "" {
+		log.LogHandlerError(logger, errors.New("url is required"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	danceResult, err := u.uc.UploadDanceByURL(r.Context(), req.URL)
+	if err != nil {
+		switch err {
+		case users.ErrorBadRequest:
+			helpers.WriteError(w, http.StatusBadRequest)
+		case users.ErrorNotFound:
+			helpers.WriteError(w, http.StatusNotFound)
+		default:
+			helpers.WriteError(w, http.StatusInternalServerError)
+		}
+		return
+	}
+
+	if user := getUserFromContext(r.Context()); user != nil {
+		_ = u.uc.AddToHistory(r.Context(), user.ID, danceResult.DanceID, req.URL)
+	}
+
+	response := models.LoadDanceResponse{
+		DanceID:             danceResult.DanceID,
+		FullGlbKey:          danceResult.FullGlbKey,
+		GlbKeys:             danceResult.GlbKeys,
+		SegmentsKey:         danceResult.SegmentsKey,
+		NumFrames:           int(danceResult.NumFrames),
+		NumSegments:         int(danceResult.NumSegments),
+		DurationSec:         danceResult.DurationSec,
+		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
+		VideoPath:           danceResult.VideoPath,
+	}
+	response.Sanitize()
+
+	helpers.WriteJSON(w, response)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// GetDanceByID godoc
+// @Summary      Получить информацию о танце по ID
+// @Description  Возвращает метаданные обработанного танца
+// @Tags         dances
+// @Security     OptionalAuth
+// @Param        id   path      string  true  "ID танца"
+// @Success      200  {object}  models.LoadDanceResponse
+// @Failure      400  {string}  string  "Не указан ID танца"
+// @Failure      404  {string}  string  "Танец не найден"
+// @Failure      500  {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/dance/{id} [get]
+func (u *UserHandler) GetDanceByID(w http.ResponseWriter, r *http.Request) {
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+	vars := mux.Vars(r)
+	danceID := vars["id"]
+	if danceID == "" {
+		log.LogHandlerError(logger, errors.New("dance id is required"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	danceResult, err := u.uc.GetDanceByID(r.Context(), danceID)
+	if err != nil {
+		switch err {
+		case users.ErrorNotFound:
 			helpers.WriteError(w, http.StatusNotFound)
 		default:
 			helpers.WriteError(w, http.StatusInternalServerError)
@@ -351,17 +474,154 @@ func (u *UserHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 		NumSegments:         int(danceResult.NumSegments),
 		DurationSec:         danceResult.DurationSec,
 		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
-		VideoPath:			 danceResult.VideoPath,
+		VideoPath:           danceResult.VideoPath,
 	}
-
 	response.Sanitize()
 
 	helpers.WriteJSON(w, response)
 	log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
 
+// GetMainPage godoc
+// @Summary      Получить список танцев для главной страницы
+// @Description  Возвращает массив танцев (возможно, популярных или недавних)
+// @Tags         dances
+// @Security     OptionalAuth
+// @Produce      json
+// @Success      200  {object}  models.MainPageResponse
+// @Failure      500  {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/main_page [get]
+func (u *UserHandler) GetMainPage(w http.ResponseWriter, r *http.Request) {
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+	videos, err := u.uc.GetMainPage(r.Context())
+	if err != nil {
+		helpers.WriteError(w, http.StatusInternalServerError)
+		return
+	}
+
+	response := models.MainPageResponse{
+		Count:  len(videos),
+		Videos: videos,
+	}
+
+	helpers.WriteJSON(w, response)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// GetSegmentDescription godoc
+// @Summary      Получить текстовое описание сегмента танца
+// @Description  Возвращает описание для указанного сегмента танца
+// @Tags         dances
+// @Security     OptionalAuth
+// @Param        dance_id     path      string  true  "ID танца"
+// @Param        segment_idx  path      int     true  "Индекс сегмента (начиная с 0)"
+// @Success      200          {object}  models.SegmentDescriptionResponse
+// @Failure      400          {string}  string  "Неверные параметры запроса"
+// @Failure      404          {string}  string  "Танец или сегмент не найден"
+// @Failure      500          {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/dance/{dance_id}/segment/{segment_idx} [get]
+func (u *UserHandler) GetSegmentDescription(w http.ResponseWriter, r *http.Request) {
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+	vars := mux.Vars(r)
+	danceID := vars["dance_id"]
+	segmentIdxStr := vars["segment_idx"]
+
+	if danceID == "" || segmentIdxStr == "" {
+		log.LogHandlerError(logger, errors.New("dance_id and segment_idx are required"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	segmentIdx, err := strconv.Atoi(segmentIdxStr)
+	if err != nil || segmentIdx < 0 {
+		log.LogHandlerError(logger, errors.New("invalid segment_idx"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	result, err := u.uc.GetSegmentDescription(r.Context(), danceID, segmentIdx)
+	if err != nil {
+		switch err {
+		case users.ErrorNotFound:
+			helpers.WriteError(w, http.StatusNotFound)
+		default:
+			helpers.WriteError(w, http.StatusInternalServerError)
+		}
+		return
+	}
+
+	response := models.SegmentDescriptionResponse{
+		DanceID:     result.DanceID,
+		SegmentIdx:  result.SegmentIdx,
+		Description: result.Description,
+	}
+
+	helpers.WriteJSON(w, response)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+// OptionalAuthMiddleware godoc
+// @Summary      Middleware опциональной аутентификации
+// @Description  Пытается извлечь пользователя из JWT-куки, при успехе добавляет в контекст.
+//               Если токена нет или он невалиден — запрос продолжается без пользователя.
+// @Tags         internal
+// @Security     OptionalAuth
+func (h *UserHandler) OptionalAuthMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        cookie, err := r.Cookie(CookieName)
+        if err == nil && cookie.Value != "" {
+            user, err := h.client.ValidateAndGetUser(r.Context(), &gen.ValidateAndGetUserRequest{Token: cookie.Value})
+            if err == nil {
+                neededUser := models.User{
+                    ID: uuid.FromStringOrNil(user.ID),
+                }
+                ctx := context.WithValue(r.Context(), users.UserKey, neededUser)
+                next.ServeHTTP(w, r.WithContext(ctx))
+                return
+            }
+        }
+        next.ServeHTTP(w, r)
+    })
+}
+
+// GetSearchHistory godoc
+// @Summary      История поиска пользователя
+// @Description  Возвращает список ранее загруженных или просмотренных танцев текущего пользователя
+// @Tags         users
+// @Security     ApiKeyAuth
+// @Produce      json
+// @Success      200  {array}   models.SearchHistoryItem
+// @Failure      401  {string}  string  "Пользователь не авторизован"
+// @Failure      500  {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/history [get]
+func (h *UserHandler) GetSearchHistory(w http.ResponseWriter, r *http.Request) {
+    user := getUserFromContext(r.Context())
+    if user == nil {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
+        return
+    }
+    items, err := h.uc.GetHistory(r.Context(), user.ID)
+    if err != nil {
+        http.Error(w, "internal error", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusOK)
+    json.NewEncoder(w).Encode(items)
+}
+
+func getUserFromContext(ctx context.Context) *models.User {
+	user, ok := ctx.Value(users.UserKey).(models.User)
+	if !ok {
+		return nil
+	}
+	return &user
+}
+
 func convertToH264(input []byte) ([]byte, error) {
-	
 	tmpDir := "/dddance-back/tmp"
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		tmpDir = "."
@@ -413,208 +673,79 @@ func convertToH264(input []byte) ([]byte, error) {
 	return result, nil
 }
 
-
-// LoadDanceByURL godoc
-// @Summary Load Dance by URL
-// @Tags users
-// @Accept json
-// @Produce json
-// @Param input body models.LoadDanceByURLInput true "Dance URL and dance_id"
-// @Success 200 {object} models.LoadDanceResponse
-// @Failure 400
-// @Failure 500
-// @Router /users/loadByURL [post]
-func (u *UserHandler) LoadDanceByURL(w http.ResponseWriter, r *http.Request) {
-    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
-
-    var req models.LoadDanceByURLInput
-    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-        log.LogHandlerError(logger, fmt.Errorf("invalid request body: %w", err), http.StatusBadRequest)
-        helpers.WriteError(w, http.StatusBadRequest)
+// DeleteFromHistory godoc
+// @Summary      Удалить запись из истории поиска
+// @Description  Удаляет запись истории по её ID, принадлежащую текущему пользователю
+// @Tags         users
+// @Security     ApiKeyAuth
+// @Param        history_id  path      string  true  "UUID записи истории"
+// @Success      204         "Запись успешно удалена"
+// @Failure      400         {string}  string  "Неверный ID записи"
+// @Failure      401         {string}  string  "Пользователь не авторизован"
+// @Failure      404         {string}  string  "Запись не найдена"
+// @Failure      500         {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/history/{history_id} [delete]
+func (h *UserHandler) DeleteFromHistory(w http.ResponseWriter, r *http.Request) {
+    user := getUserFromContext(r.Context())
+    if user == nil {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
         return
     }
-    req.Sanitize()
-
-    if req.URL == "" {
-        log.LogHandlerError(logger, errors.New("url is required"), http.StatusBadRequest)
-        helpers.WriteError(w, http.StatusBadRequest)
+    historyID := uuid.FromStringOrNil(mux.Vars(r)["history_id"])
+    if historyID == uuid.Nil {
+        http.Error(w, "invalid history_id", http.StatusBadRequest)
         return
     }
-
-    danceResult, err := u.client.LoadDanceByURL(r.Context(), &gen.LoadDanceByURLRequest{
-        Url:     req.URL,
-    })
+    err := h.uc.DeleteFromHistory(r.Context(), historyID, user.ID)
     if err != nil {
-        st, _ := status.FromError(err)
-        switch st.Code() {
-        case codes.InvalidArgument:
-            helpers.WriteError(w, http.StatusBadRequest)
-        case codes.NotFound:
-            helpers.WriteError(w, http.StatusNotFound)
-        default:
-            helpers.WriteError(w, http.StatusInternalServerError)
+        if err == users.ErrorNotFound {
+            http.Error(w, "not found", http.StatusNotFound)
+            return
         }
+        http.Error(w, "internal error", http.StatusInternalServerError)
         return
     }
-
-    response := models.LoadDanceResponse{
-        DanceID:             danceResult.DanceID,
-        FullGlbKey:          danceResult.FullGlbKey,
-        GlbKeys:             danceResult.GlbKeys,
-        SegmentsKey:         danceResult.SegmentsKey,
-        NumFrames:           int(danceResult.NumFrames),
-        NumSegments:         int(danceResult.NumSegments),
-        DurationSec:         danceResult.DurationSec,
-        NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
-    }
-    response.Sanitize()
-
-    helpers.WriteJSON(w, response)
-    log.LogHandlerInfo(logger, "success", http.StatusOK)
+    w.WriteHeader(http.StatusNoContent)
 }
 
-// GetDanceByID godoc
-// @Summary Get dance result by ID
-// @Tags users
-// @Produce json
-// @Param id path string true "Dance ID"
-// @Success 200 {object} models.LoadDanceResponse
-// @Failure 400
-// @Failure 404
-// @Failure 500
-// @Router /users/dance/{id} [get]
-func (u *UserHandler) GetDanceByID(w http.ResponseWriter, r *http.Request) {
-    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
-
-    vars := mux.Vars(r)
-    danceID := vars["id"]
-    if danceID == "" {
-        log.LogHandlerError(logger, errors.New("dance id is required"), http.StatusBadRequest)
-        helpers.WriteError(w, http.StatusBadRequest)
+// UpdateHistoryName godoc
+// @Summary      Обновить название записи в истории
+// @Description  Изменяет пользовательское название для указанной записи истории
+// @Tags         users
+// @Security     ApiKeyAuth
+// @Accept       json
+// @Param        history_id  path      string                         true  "UUID записи истории"
+// @Param        request     body      models.UpdateHistoryNameInput true  "Новое название"
+// @Success      204         "Название успешно обновлено"
+// @Failure      400         {string}  string  "Неверный ID записи или тело запроса"
+// @Failure      401         {string}  string  "Пользователь не авторизован"
+// @Failure      404         {string}  string  "Запись не найдена"
+// @Failure      500         {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/history/{history_id} [put]
+func (h *UserHandler) UpdateHistoryName(w http.ResponseWriter, r *http.Request) {
+    user := getUserFromContext(r.Context())
+    if user == nil {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
         return
     }
-
-    danceResult, err := u.client.GetDanceByID(r.Context(), &gen.GetDanceByIDRequest{
-        DanceId: danceID,
-    })
+    historyID := uuid.FromStringOrNil(mux.Vars(r)["history_id"])
+    if historyID == uuid.Nil {
+        http.Error(w, "invalid history_id", http.StatusBadRequest)
+        return
+    }
+    var input models.UpdateHistoryNameInput
+    if err := json.NewDecoder(r.Body).Decode(&input); err != nil || input.Name == "" {
+        http.Error(w, "invalid body", http.StatusBadRequest)
+        return
+    }
+    err := h.uc.UpdateHistoryName(r.Context(), historyID, user.ID, input.Name)
     if err != nil {
-        st, _ := status.FromError(err)
-        switch st.Code() {
-        case codes.NotFound:
-            helpers.WriteError(w, http.StatusNotFound)
-        default:
-            helpers.WriteError(w, http.StatusInternalServerError)
+        if err == users.ErrorNotFound {
+            http.Error(w, "not found", http.StatusNotFound)
+            return
         }
+        http.Error(w, "internal error", http.StatusInternalServerError)
         return
     }
-
-    response := models.LoadDanceResponse{
-		DanceID:             danceResult.DanceID,
-		FullGlbKey:          danceResult.FullGlbKey,
-		GlbKeys:             danceResult.GlbKeys,
-		SegmentsKey:         danceResult.SegmentsKey,
-		NumFrames:           int(danceResult.NumFrames),
-		NumSegments:         int(danceResult.NumSegments),
-		DurationSec:         danceResult.DurationSec,
-		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
-		VideoPath:           danceResult.VideoPath,
-	}
-    response.Sanitize()
-
-    helpers.WriteJSON(w, response)
-    log.LogHandlerInfo(logger, "success", http.StatusOK)
-}
-
-// GetMainPage godoc
-// @Summary Get main page videos
-// @Tags users
-// @Produce json
-// @Success 200 {object} models.MainPageResponse
-// @Failure 500
-// @Router /users/main_page [get]
-func (u *UserHandler) GetMainPage(w http.ResponseWriter, r *http.Request) {
-    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
-
-    result, err := u.client.GetMainPage(r.Context(), &gen.GetMainPageRequest{})
-    if err != nil {
-        st, _ := status.FromError(err)
-        switch st.Code() {
-        default:
-            helpers.WriteError(w, http.StatusInternalServerError)
-        }
-        return
-    }
-
-    var videos []models.VideoItem
-    for _, v := range result.Videos {
-        videos = append(videos, models.VideoItem{
-            ID:  v.ID,
-            URL: v.URL,
-        })
-    }
-
-    response := models.MainPageResponse{
-        Count:  int(result.Count),
-        Videos: videos,
-    }
-
-    helpers.WriteJSON(w, response)
-    log.LogHandlerInfo(logger, "success", http.StatusOK)
-}
-
-
-// GetSegmentDescription godoc
-// @Summary Get segment description by dance ID and segment index
-// @Tags users
-// @Produce json
-// @Param dance_id path string true "Dance ID"
-// @Param segment_idx path int true "Segment index"
-// @Success 200 {object} models.SegmentDescriptionResponse
-// @Failure 400
-// @Failure 404
-// @Failure 500
-// @Router /users/dance/{dance_id}/segment/{segment_idx} [get]
-func (u *UserHandler) GetSegmentDescription(w http.ResponseWriter, r *http.Request) {
-    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
-
-    vars := mux.Vars(r)
-    danceID := vars["dance_id"]
-    segmentIdxStr := vars["segment_idx"]
-
-    if danceID == "" || segmentIdxStr == "" {
-        log.LogHandlerError(logger, errors.New("dance_id and segment_idx are required"), http.StatusBadRequest)
-        helpers.WriteError(w, http.StatusBadRequest)
-        return
-    }
-
-    segmentIdx, err := strconv.Atoi(segmentIdxStr)
-    if err != nil || segmentIdx < 0 {
-        log.LogHandlerError(logger, errors.New("invalid segment_idx"), http.StatusBadRequest)
-        helpers.WriteError(w, http.StatusBadRequest)
-        return
-    }
-
-    result, err := u.client.GetSegmentDescription(r.Context(), &gen.GetSegmentDescriptionRequest{
-        DanceId:    danceID,
-        SegmentIdx: int32(segmentIdx),
-    })
-    if err != nil {
-        st, _ := status.FromError(err)
-        switch st.Code() {
-        case codes.NotFound:
-            helpers.WriteError(w, http.StatusNotFound)
-        default:
-            helpers.WriteError(w, http.StatusInternalServerError)
-        }
-        return
-    }
-
-    response := models.SegmentDescriptionResponse{
-        DanceID:     result.DanceId,
-        SegmentIdx:  int(result.SegmentIdx),
-        Description: result.Description,
-    }
-
-    helpers.WriteJSON(w, response)
-    log.LogHandlerInfo(logger, "success", http.StatusOK)
+    w.WriteHeader(http.StatusNoContent)
 }

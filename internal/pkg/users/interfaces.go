@@ -19,6 +19,10 @@ type UsersUsecase interface {
 	GetDanceByID(ctx context.Context, danceID string) (*models.UploadDanceResult, error)
 	GetSegmentDescription(ctx context.Context, danceID string, segmentIdx int) (*models.SegmentDescriptionResult, error)
 	GetMainPage(ctx context.Context) ([]models.VideoItem, error)
+	AddToHistory(ctx context.Context, userID uuid.UUID, danceID string, sourceURL string) error
+	GetHistory(ctx context.Context, userID uuid.UUID) ([]models.SearchHistoryItem, error)
+	DeleteFromHistory(ctx context.Context, historyID uuid.UUID, userID uuid.UUID) error
+	UpdateHistoryName(ctx context.Context, historyID uuid.UUID, userID uuid.UUID, name string) error
 }
 
 
@@ -26,6 +30,10 @@ type UsersRepo interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (models.User, error)
 	GetUserByLogin(ctx context.Context, login string) (models.User, error)
 	UpdateUserPassword(ctx context.Context, version int, userID uuid.UUID, passwordHash []byte) error
+	AddToHistory(ctx context.Context, userID uuid.UUID, danceID string, sourceURL string) error
+	GetHistory(ctx context.Context, userID uuid.UUID) ([]models.SearchHistoryItem, error)
+	DeleteFromHistory(ctx context.Context, historyID uuid.UUID, userID uuid.UUID) error
+	UpdateHistoryName(ctx context.Context, historyID uuid.UUID, userID uuid.UUID, name string) error
 }
 
 type StorageRepo interface {
