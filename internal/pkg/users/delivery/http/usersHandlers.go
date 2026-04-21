@@ -444,44 +444,48 @@ func (u *UserHandler) LoadDanceByURL(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {string}  string  "Внутренняя ошибка сервера"
 // @Router       /users/dance/{id} [get]
 func (u *UserHandler) GetDanceByID(w http.ResponseWriter, r *http.Request) {
-	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 
-	vars := mux.Vars(r)
-	danceID := vars["id"]
-	if danceID == "" {
-		log.LogHandlerError(logger, errors.New("dance id is required"), http.StatusBadRequest)
-		helpers.WriteError(w, http.StatusBadRequest)
-		return
-	}
+    danceID := mux.Vars(r)["id"]
+    if danceID == "" {
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
 
-	danceResult, err := u.uc.GetDanceByID(r.Context(), danceID)
-	if err != nil {
-		switch err {
-		case users.ErrorNotFound:
-			helpers.WriteError(w, http.StatusNotFound)
-		default:
-			helpers.WriteError(w, http.StatusInternalServerError)
-		}
-		return
-	}
+    // Получаем userID опционально
+    var userID *uuid.UUID
+    if user := getUserFromContext(r.Context()); user != nil {
+        userID = &user.ID
+    }
 
-	response := models.LoadDanceResponse{
-		DanceID:             danceResult.DanceID,
-		FullGlbKey:          danceResult.FullGlbKey,
-		GlbKeys:             danceResult.GlbKeys,
-		SegmentsKey:         danceResult.SegmentsKey,
-		NumFrames:           int(danceResult.NumFrames),
-		NumSegments:         int(danceResult.NumSegments),
-		DurationSec:         danceResult.DurationSec,
-		NumSegmentsRendered: int(danceResult.NumSegmentsRendered),
-		VideoPath:           danceResult.VideoPath,
-	}
-	response.Sanitize()
+    result, err := u.uc.GetDanceByID(r.Context(), danceID, userID) // передаём userID
+    if err != nil {
+        switch err {
+        case users.ErrorNotFound:
+            helpers.WriteError(w, http.StatusNotFound)
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
 
-	helpers.WriteJSON(w, response)
-	log.LogHandlerInfo(logger, "success", http.StatusOK)
+    response := models.LoadDanceResponse{
+        DanceID:             result.DanceID,
+        FullGlbKey:          result.FullGlbKey,
+        GlbKeys:             result.GlbKeys,
+        SegmentsKey:         result.SegmentsKey,
+        NumFrames:           result.NumFrames,
+        NumSegments:         result.NumSegments,
+        DurationSec:         result.DurationSec,
+        NumSegmentsRendered: result.NumSegmentsRendered,
+        VideoPath:           result.VideoPath,
+        LikesCount:          result.LikesCount, 
+        IsLiked:             result.IsLiked,
+    }
+
+    helpers.WriteJSON(w, response)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
-
 // GetMainPage godoc
 // @Summary      Получить список танцев для главной страницы
 // @Description  Возвращает массив танцев (возможно, популярных или недавних)
@@ -748,4 +752,89 @@ func (h *UserHandler) UpdateHistoryName(w http.ResponseWriter, r *http.Request) 
         return
     }
     w.WriteHeader(http.StatusNoContent)
+}
+
+
+// ToggleLike godoc
+// @Summary      Поставить или снять лайк с танца
+// @Description  Если лайк уже стоит — снимает его, если нет — ставит. Один пользователь может поставить только один лайк.
+// @Tags         dances
+// @Security     ApiKeyAuth
+// @Param        id   path      string  true  "ID танца"
+// @Success      200  {object}  models.LikeResponse
+// @Failure      400  {string}  string  "Не указан ID танца"
+// @Failure      401  {string}  string  "Пользователь не авторизован"
+// @Failure      500  {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/dance/{id}/like [post]
+func (h *UserHandler) ToggleLike(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    user := getUserFromContext(r.Context())
+    if user == nil {
+        helpers.WriteError(w, http.StatusUnauthorized)
+        return
+    }
+
+    danceID := mux.Vars(r)["id"]
+    if danceID == "" {
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    result, err := h.uc.ToggleLike(r.Context(), user.ID, danceID)
+    if err != nil {
+        helpers.WriteError(w, http.StatusInternalServerError)
+        return
+    }
+
+    helpers.WriteJSON(w, result)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
+}
+
+
+// CompareDance godoc
+// @Summary      Сравнить танец пользователя с оригиналом
+// @Description  Загружает видео пользователя и сравнивает с указанным танцем по сегменту.
+//               segment_idx = -1 означает сравнение всего видео целиком.
+// @Tags         dances
+// @Accept       json
+// @Produce      json
+// @Param        input  body      models.DanceCompareRequest   true  "Параметры сравнения"
+// @Success      200    {object}  models.DanceCompareResponse
+// @Failure      400    {string}  string  "Неверные параметры запроса"
+// @Failure      500    {string}  string  "Внутренняя ошибка сервера"
+// @Router       /users/dance/compare [post]
+func (u *UserHandler) CompareDance(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    var input models.DanceCompareRequest
+    if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+        log.LogHandlerError(logger, err, http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    if input.VideoKey == "" || input.DanceID == "" {
+        log.LogHandlerError(logger, errors.New("video_key and dance_id are required"), http.StatusBadRequest)
+        helpers.WriteError(w, http.StatusBadRequest)
+        return
+    }
+
+    if input.SegmentIdx == 0 {
+        input.SegmentIdx = -1
+    }
+
+    result, err := u.uc.CompareDance(r.Context(), input.VideoKey, input.DanceID, input.SegmentIdx)
+    if err != nil {
+        switch err {
+        case users.ErrorBadRequest:
+            helpers.WriteError(w, http.StatusBadRequest)
+        default:
+            helpers.WriteError(w, http.StatusInternalServerError)
+        }
+        return
+    }
+
+    helpers.WriteJSON(w, result)
+    log.LogHandlerInfo(logger, "success", http.StatusOK)
 }

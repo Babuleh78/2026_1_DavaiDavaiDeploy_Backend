@@ -21,3 +21,13 @@ CREATE TABLE IF NOT EXISTS search_history (
     source_url  text DEFAULT '',
     created_at  timestamp with time zone DEFAULT CURRENT_TIMESTAMP
 );
+
+
+CREATE TABLE IF NOT EXISTS dance_likes (
+    user_id  uuid NOT NULL REFERENCES user_table(id) ON DELETE CASCADE,
+    dance_id text NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, dance_id)
+);
+
+CREATE INDEX IF NOT EXISTS dance_likes_dance_id_idx ON dance_likes(dance_id);

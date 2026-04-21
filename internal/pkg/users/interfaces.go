@@ -16,13 +16,16 @@ type UsersUsecase interface {
 	ChangePassword(ctx context.Context, id uuid.UUID, oldPassword string, newPassword string) (models.User, string, error)
 	UploadDance(ctx context.Context, buffer []byte, fileFormat string) (*models.UploadDanceResult, error)
 	UploadDanceByURL(ctx context.Context, videoURL string) (*models.UploadDanceResult, error)
-	GetDanceByID(ctx context.Context, danceID string) (*models.UploadDanceResult, error)
+	GetDanceByID(ctx context.Context, danceID string, userID *uuid.UUID) (*models.UploadDanceResult, error)
 	GetSegmentDescription(ctx context.Context, danceID string, segmentIdx int) (*models.SegmentDescriptionResult, error)
 	GetMainPage(ctx context.Context) ([]models.VideoItem, error)
 	AddToHistory(ctx context.Context, userID uuid.UUID, danceID string, sourceURL string) error
 	GetHistory(ctx context.Context, userID uuid.UUID) ([]models.SearchHistoryItem, error)
 	DeleteFromHistory(ctx context.Context, historyID uuid.UUID, userID uuid.UUID) error
 	UpdateHistoryName(ctx context.Context, historyID uuid.UUID, userID uuid.UUID, name string) error
+	ToggleLike(ctx context.Context, userID uuid.UUID, danceID string) (*models.LikeResponse, error)
+	GetTopLikedDances(ctx context.Context, limit int) ([]models.DanceLikeStat, error)
+	CompareDance(ctx context.Context, videoKey string, danceID string, segmentIdx int) (*models.DanceCompareResponse, error)
 }
 
 
@@ -34,6 +37,10 @@ type UsersRepo interface {
 	GetHistory(ctx context.Context, userID uuid.UUID) ([]models.SearchHistoryItem, error)
 	DeleteFromHistory(ctx context.Context, historyID uuid.UUID, userID uuid.UUID) error
 	UpdateHistoryName(ctx context.Context, historyID uuid.UUID, userID uuid.UUID, name string) error
+	ToggleLike(ctx context.Context, userID uuid.UUID, danceID string) (liked bool, err error)
+	GetLikesCount(ctx context.Context, danceID string) (int64, error)
+	IsLikedByUser(ctx context.Context, userID uuid.UUID, danceID string) (bool, error)
+	GetTopLikedDances(ctx context.Context, limit int) ([]models.DanceLikeStat, error)
 }
 
 type StorageRepo interface {
