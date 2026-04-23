@@ -7,31 +7,37 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
+	"os"
 	"os/signal"
 	"syscall"
 	"time"
 	_ "DDDance/docs"
 
-	authHandlers "DDDance/internal/pkg/auth/delivery/http"
-	authRepo "DDDance/internal/pkg/auth/repo"
-	authUsecase "DDDance/internal/pkg/auth/usecase"
-	"DDDance/internal/pkg/middleware/cors"
-	logger "DDDance/internal/pkg/middleware/logger"
-	userHandlers "DDDance/internal/pkg/users/delivery/http"
-	"os"
-
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/joho/godotenv"
 	httpSwagger "github.com/swaggo/http-swagger"
 	"google.golang.org/grpc"
 
-	"github.com/gorilla/mux"
-
+	authHandlers "DDDance/internal/pkg/auth/delivery/http"
 	authGen "DDDance/internal/pkg/auth/delivery/grpc/gen"
+	authRepo "DDDance/internal/pkg/auth/repo"
+	authUsecase "DDDance/internal/pkg/auth/usecase"
+	"DDDance/internal/pkg/middleware/cors"
+	logger "DDDance/internal/pkg/middleware/logger"
+	userHandlers "DDDance/internal/pkg/users/delivery/http"
+	userRepo "DDDance/internal/pkg/users/repo/pg"
+	storageRepo "DDDance/internal/pkg/users/repo/s3"
+	userUsecase "DDDance/internal/pkg/users/usecase"
 )
 
 func initDB(ctx context.Context) (*pgxpool.Pool, error) {
@@ -59,14 +65,62 @@ func initDB(ctx context.Context) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
+func initS3Client(ctx context.Context) (*s3.Client, string, error) {
+	endpoint := os.Getenv("AWS_S3_ENDPOINT")
+	bucket := os.Getenv("AWS_S3_BUCKET")
+	accessKey := os.Getenv("AWS_ACCESS_KEY_ID")
+	secretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
+
+	region := "ru-7"
+
+	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		if service == s3.ServiceID && endpoint != "" {
+			return aws.Endpoint{
+				URL:           endpoint,
+				SigningRegion: region,
+			}, nil
+		}
+		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+	})
+
+	customHTTPClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
+		},
+	}
+
+	cfg, err := awsconfig.LoadDefaultConfig(ctx,
+		awsconfig.WithRegion(region),
+		awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
+		awsconfig.WithEndpointResolverWithOptions(customResolver),
+		awsconfig.WithHTTPClient(customHTTPClient),
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
+		o.UsePathStyle = true
+	})
+	return client, bucket, nil
+}
+
 func main() {
 	_ = godotenv.Load()
 	ctx := context.Background()
+
 	dbpool, err := initDB(ctx)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
 	}
 	defer dbpool.Close()
+
+	s3Client, s3Bucket, err := initS3Client(ctx)
+	if err != nil {
+		log.Printf("Warning: Unable to connect to S3: %v\n", err)
+	}
 
 	// Подключение к auth microservice
 	authConn, err := grpc.Dial("auth:5459", grpc.WithInsecure())
@@ -80,8 +134,12 @@ func main() {
 	authRepo := authRepo.NewAuthRepository(dbpool)
 	authUsecase := authUsecase.NewAuthUsecase(authRepo)
 
+	userPgRepo := userRepo.NewUserRepository(dbpool)
+	userS3Repo := storageRepo.NewS3Repository(s3Client, s3Bucket)
+	usersUC := userUsecase.NewUserUsecase(userPgRepo, userS3Repo)
+
 	authHandler := authHandlers.NewAuthHandler(authClient, authUsecase)
-	userHandler := userHandlers.NewUserHandler(authClient)
+	userHandler := userHandlers.NewUserHandler(authClient, usersUC)
 
 	ddLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -107,23 +165,26 @@ func main() {
 	protectedAuthRouter.HandleFunc("/logout", authHandler.LogOutUser).Methods(http.MethodPost, http.MethodOptions)
 
 	userRouter := apiRouter.PathPrefix("/users").Subrouter()
-	userRouter.HandleFunc("/load", userHandler.LoadDance).Methods(http.MethodPost)
-	userRouter.HandleFunc("/loadByURL", userHandler.LoadDanceByURL).Methods(http.MethodPost)
+	userRouter.Handle("/load",      userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDance))).Methods(http.MethodPost)
+	userRouter.Handle("/loadByURL", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDanceByURL))).Methods(http.MethodPost, http.MethodOptions)
+
 	userRouter.HandleFunc("/dance/{id}", userHandler.GetDanceByID).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/main_page", userHandler.GetMainPage).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/dance/{dance_id}/segment/{segment_idx}", userHandler.GetSegmentDescription).Methods(http.MethodGet, http.MethodOptions)
-	// Protected user routes
+
+
 	protectedUserRouter := userRouter.PathPrefix("").Subrouter()
 	protectedUserRouter.Use(userHandler.Middleware)
 	protectedUserRouter.HandleFunc("/change/password", userHandler.ChangePassword).Methods(http.MethodPut, http.MethodOptions)
-
+	protectedUserRouter.HandleFunc("/history", userHandler.GetSearchHistory).Methods(http.MethodGet, http.MethodOptions)
+	protectedUserRouter.HandleFunc("/history/{history_id}", userHandler.DeleteFromHistory).Methods(http.MethodDelete, http.MethodOptions)
+	protectedUserRouter.HandleFunc("/history/{history_id}", userHandler.UpdateHistoryName).Methods(http.MethodPut, http.MethodOptions)
+			
 	danceSrv := http.Server{
 		Handler: mainRouter,
 		Addr:    ":5458",
 	}
 
-	
-	
 	go func() {
 		log.Println("Starting main server on port 5458!")
 		err := danceSrv.ListenAndServe()

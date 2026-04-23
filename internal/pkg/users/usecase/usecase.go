@@ -73,6 +73,15 @@ func (uc *UserUsecase) ParseToken(token string) (*jwt.Token, error) {
 	})
 }
 
+func (uc *UserUsecase) AddToHistory(ctx context.Context, userID uuid.UUID, danceID string, sourceURL string) error {
+    return uc.userRepo.AddToHistory(ctx, userID, danceID, sourceURL)
+}
+
+func (uc *UserUsecase) GetHistory(ctx context.Context, userID uuid.UUID) ([]models.SearchHistoryItem, error) {
+    return uc.userRepo.GetHistory(ctx, userID)
+}
+
+
 func (uc *UserUsecase) ValidateAndGetUser(ctx context.Context, token string) (models.User, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
@@ -233,7 +242,6 @@ func (uc *UserUsecase) UploadDance(
 
 
 func (uc *UserUsecase) enqueueProcessing(ctx context.Context, videoKey, danceID string) (string, error) {
-	//Кстати обратите внимание, ML_SERVICE_URL=http://ml-service:8000/ml, теперь нужно /ml прописывать, так надо
     processingURL := os.Getenv("ML_SERVICE_URL") + "/process"
     requestBody := map[string]string{
         "video_key": videoKey, 
@@ -424,7 +432,7 @@ func (uc *UserUsecase) GetSegmentDescription(ctx context.Context, danceID string
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
     mlURL := fmt.Sprintf("%s/segment_description/%s/%d", os.Getenv("ML_SERVICE_URL"), danceID, segmentIdx)
-    client := &http.Client{Timeout: 10 * time.Second}
+    client := &http.Client{Timeout: 1000 * time.Second}
 
     resp, err := client.Get(mlURL)
     if err != nil {
@@ -447,4 +455,50 @@ func (uc *UserUsecase) GetSegmentDescription(ctx context.Context, danceID string
     }
 
     return &result, nil
+}
+
+func (uc *UserUsecase) DeleteFromHistory(ctx context.Context, historyID uuid.UUID, userID uuid.UUID) error {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    if historyID == uuid.Nil || userID == uuid.Nil {
+        logger.Error("invalid historyID or userID")
+        return users.ErrorBadRequest
+    }
+
+    err := uc.userRepo.DeleteFromHistory(ctx, historyID, userID)
+    if err != nil {
+        logger.Error("failed to delete from history", "error", err)
+        return err
+    }
+
+    logger.Info("successfully deleted history item")
+    return nil
+}
+
+func (uc *UserUsecase) UpdateHistoryName(ctx context.Context, historyID uuid.UUID, userID uuid.UUID, name string) error {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    if historyID == uuid.Nil || userID == uuid.Nil {
+        logger.Error("invalid historyID or userID")
+        return users.ErrorBadRequest
+    }
+
+    name = strings.TrimSpace(name)
+    if name == "" {
+        logger.Error("name is empty")
+        return users.ErrorBadRequest
+    }
+    if len(name) > 100 {
+        logger.Error("name is too long")
+        return users.ErrorBadRequest
+    }
+
+    err := uc.userRepo.UpdateHistoryName(ctx, historyID, userID, name)
+    if err != nil {
+        logger.Error("failed to update history name", "error", err)
+        return err
+    }
+
+    logger.Info("successfully updated history name")
+    return nil
 }

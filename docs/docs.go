@@ -29,7 +29,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.User"
+                            "$ref": "#/definitions/models.User"
                         }
                     },
                     "401": {
@@ -90,7 +90,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.SignInInput"
+                            "$ref": "#/definitions/models.SignInInput"
                         }
                     }
                 ],
@@ -98,7 +98,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.User"
+                            "$ref": "#/definitions/models.User"
                         }
                     },
                     "400": {
@@ -133,7 +133,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.SignUpInput"
+                            "$ref": "#/definitions/models.SignUpInput"
                         }
                     }
                 ],
@@ -141,7 +141,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.User"
+                            "$ref": "#/definitions/models.User"
                         }
                     },
                     "400": {
@@ -156,26 +156,92 @@ const docTemplate = `{
                 }
             }
         },
-        "/users/dance/{dance_id}/segment/{segment_idx}": {
-            "get": {
+        "/users/change/password": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Изменяет пароль, возвращает обновлённый JWT и CSRF-токен в куках и заголовке X-CSRF-Token",
+                "consumes": [
+                    "application/json"
+                ],
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "users"
                 ],
-                "summary": "Get segment description by dance ID and segment index",
+                "summary": "Изменить пароль текущего пользователя",
+                "parameters": [
+                    {
+                        "description": "Старый и новый пароль",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ChangePasswordInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверный запрос",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Пользователь не найден",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/dance/{dance_id}/segment/{segment_idx}": {
+            "get": {
+                "security": [
+                    {
+                        "OptionalAuth": []
+                    }
+                ],
+                "description": "Возвращает описание для указанного сегмента танца",
+                "tags": [
+                    "dances"
+                ],
+                "summary": "Получить текстовое описание сегмента танца",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Dance ID",
+                        "description": "ID танца",
                         "name": "dance_id",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "integer",
-                        "description": "Segment index",
+                        "description": "Индекс сегмента (начиная с 0)",
                         "name": "segment_idx",
                         "in": "path",
                         "required": true
@@ -185,34 +251,46 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.SegmentDescriptionResponse"
+                            "$ref": "#/definitions/models.SegmentDescriptionResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Неверные параметры запроса",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "404": {
-                        "description": "Not Found"
+                        "description": "Танец или сегмент не найден",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         },
         "/users/dance/{id}": {
             "get": {
-                "produces": [
-                    "application/json"
+                "security": [
+                    {
+                        "OptionalAuth": []
+                    }
                 ],
+                "description": "Возвращает метаданные обработанного танца",
                 "tags": [
-                    "users"
+                    "dances"
                 ],
-                "summary": "Get dance result by ID",
+                "summary": "Получить информацию о танце по ID",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Dance ID",
+                        "description": "ID танца",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -222,23 +300,192 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.LoadDanceResponse"
+                            "$ref": "#/definitions/models.LoadDanceResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Не указан ID танца",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "404": {
-                        "description": "Not Found"
+                        "description": "Танец не найден",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/history": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Возвращает список ранее загруженных или просмотренных танцев текущего пользователя",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "История поиска пользователя",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.SearchHistoryItem"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/history/{history_id}": {
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Изменяет пользовательское название для указанной записи истории",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Обновить название записи в истории",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID записи истории",
+                        "name": "history_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Новое название",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.UpdateHistoryNameInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Название успешно обновлено"
+                    },
+                    "400": {
+                        "description": "Неверный ID записи или тело запроса",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Запись не найдена",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Удаляет запись истории по её ID, принадлежащую текущему пользователю",
+                "tags": [
+                    "users"
+                ],
+                "summary": "Удалить запись из истории поиска",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "UUID записи истории",
+                        "name": "history_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Запись успешно удалена"
+                    },
+                    "400": {
+                        "description": "Неверный ID записи",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Запись не найдена",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         },
         "/users/load": {
             "post": {
+                "security": [
+                    {
+                        "OptionalAuth": []
+                    }
+                ],
+                "description": "Принимает видеофайл через multipart/form-data, конвертирует в H.264 и отправляет на анализ",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -246,13 +493,13 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "dances"
                 ],
-                "summary": "Load Dance",
+                "summary": "Загрузить видео танца и обработать его",
                 "parameters": [
                     {
                         "type": "file",
-                        "description": "Dance video file (required, max 50MB, formats: mp4, mov)",
+                        "description": "Видеофайл (до 60 МБ)",
                         "name": "dance",
                         "in": "formData",
                         "required": true
@@ -262,23 +509,38 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.LoadDanceResponse"
+                            "$ref": "#/definitions/models.LoadDanceResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Ошибка чтения файла или неверный запрос",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "413": {
-                        "description": "Request Entity Too Large"
+                        "description": "Файл слишком большой",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         },
         "/users/loadByURL": {
             "post": {
+                "security": [
+                    {
+                        "OptionalAuth": []
+                    }
+                ],
+                "description": "Принимает JSON с URL, скачивает видео и обрабатывает его",
                 "consumes": [
                     "application/json"
                 ],
@@ -286,17 +548,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "dances"
                 ],
-                "summary": "Load Dance by URL",
+                "summary": "Загрузить танец по URL видео",
                 "parameters": [
                     {
-                        "description": "Dance URL and dance_id",
-                        "name": "input",
+                        "description": "URL видео",
+                        "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.LoadDanceByURLInput"
+                            "$ref": "#/definitions/models.LoadDanceByURLInput"
                         }
                     }
                 ],
@@ -304,95 +566,77 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.LoadDanceResponse"
+                            "$ref": "#/definitions/models.LoadDanceResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Неверный запрос или отсутствует URL",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "404": {
+                        "description": "Видео не найдено",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         },
         "/users/main_page": {
             "get": {
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Get main page videos",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.MainPageResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error"
-                    }
-                }
-            }
-        },
-        "/users/password": {
-            "put": {
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "users"
-                ],
-                "summary": "Change user password",
-                "parameters": [
+                "security": [
                     {
-                        "description": "Password data (old_password and new_password are required)",
-                        "name": "input",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.ChangePasswordInput"
-                        }
+                        "OptionalAuth": []
                     }
                 ],
+                "description": "Возвращает массив танцев (возможно, популярных или недавних)",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dances"
+                ],
+                "summary": "Получить список танцев для главной страницы",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.User"
+                            "$ref": "#/definitions/models.MainPageResponse"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request"
-                    },
-                    "401": {
-                        "description": "Unauthorized"
-                    },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         },
         "/users/{id}": {
             "get": {
-                "produces": [
-                    "application/json"
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
                 ],
+                "description": "Возвращает публичные данные пользователя (ID, версию, логин, аватар)",
                 "tags": [
                     "users"
                 ],
-                "summary": "Get user by ID",
+                "summary": "Получить информацию о пользователе по ID",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Genre ID",
+                        "description": "UUID пользователя",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -402,24 +646,33 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/DDDance_internal_models.User"
+                            "$ref": "#/definitions/models.User"
                         }
                     },
                     "400": {
-                        "description": "Bad Request"
+                        "description": "Неверный формат ID",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
-                    "404": {
-                        "description": "Not Found"
+                    "401": {
+                        "description": "Пользователь не авторизован",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
                     "500": {
-                        "description": "Internal Server Error"
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         }
     },
     "definitions": {
-        "DDDance_internal_models.ChangePasswordInput": {
+        "models.ChangePasswordInput": {
             "type": "object",
             "required": [
                 "new_password",
@@ -434,7 +687,7 @@ const docTemplate = `{
                 }
             }
         },
-        "DDDance_internal_models.LoadDanceByURLInput": {
+        "models.LoadDanceByURLInput": {
             "type": "object",
             "properties": {
                 "url": {
@@ -442,7 +695,7 @@ const docTemplate = `{
                 }
             }
         },
-        "DDDance_internal_models.LoadDanceResponse": {
+        "models.LoadDanceResponse": {
             "type": "object",
             "required": [
                 "dance_id",
@@ -488,7 +741,7 @@ const docTemplate = `{
                 }
             }
         },
-        "DDDance_internal_models.MainPageResponse": {
+        "models.MainPageResponse": {
             "type": "object",
             "properties": {
                 "count": {
@@ -497,12 +750,35 @@ const docTemplate = `{
                 "videos": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/DDDance_internal_models.VideoItem"
+                        "$ref": "#/definitions/models.VideoItem"
                     }
                 }
             }
         },
-        "DDDance_internal_models.SegmentDescriptionResponse": {
+        "models.SearchHistoryItem": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "dance_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "source_url": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.SegmentDescriptionResponse": {
             "type": "object",
             "properties": {
                 "dance_id": {
@@ -516,7 +792,7 @@ const docTemplate = `{
                 }
             }
         },
-        "DDDance_internal_models.SignInInput": {
+        "models.SignInInput": {
             "type": "object",
             "required": [
                 "login",
@@ -534,7 +810,7 @@ const docTemplate = `{
                 }
             }
         },
-        "DDDance_internal_models.SignUpInput": {
+        "models.SignUpInput": {
             "type": "object",
             "required": [
                 "login",
@@ -549,7 +825,15 @@ const docTemplate = `{
                 }
             }
         },
-        "DDDance_internal_models.User": {
+        "models.UpdateHistoryNameInput": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.User": {
             "type": "object",
             "required": [
                 "avatar",
@@ -586,7 +870,7 @@ const docTemplate = `{
                 }
             }
         },
-        "DDDance_internal_models.VideoItem": {
+        "models.VideoItem": {
             "type": "object",
             "properties": {
                 "id": {

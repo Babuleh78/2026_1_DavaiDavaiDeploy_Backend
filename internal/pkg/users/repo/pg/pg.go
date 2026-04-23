@@ -84,3 +84,63 @@ func (u *UserRepository) UpdateUserPassword(ctx context.Context, version int, us
 	logger.Info("succesfully updated password of user from db")
 	return err
 }
+
+func (u *UserRepository) AddToHistory(ctx context.Context, userID uuid.UUID, danceID string, sourceURL string) error {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    _, err := u.db.Exec(ctx, AddToHistoryQuery, userID, danceID, sourceURL)
+    if err != nil {
+        logger.Error("failed to add to history: " + err.Error())
+        return users.ErrorInternalServerError
+    }
+    logger.Info("successfully added to search history")
+    return nil
+}
+
+func (u *UserRepository) GetHistory(ctx context.Context, userID uuid.UUID) ([]models.SearchHistoryItem, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    rows, err := u.db.Query(ctx, GetHistoryQuery, userID)
+    if err != nil {
+        logger.Error("failed to get history: " + err.Error())
+        return nil, users.ErrorInternalServerError
+    }
+    defer rows.Close()
+
+    var items []models.SearchHistoryItem
+    for rows.Next() {
+        var item models.SearchHistoryItem
+        if err := rows.Scan(&item.ID, &item.UserID, &item.DanceID, &item.Name, &item.SourceURL, &item.CreatedAt); err != nil {
+            logger.Error("failed to scan history item: " + err.Error())
+            return nil, users.ErrorInternalServerError
+        }
+        items = append(items, item)
+    }
+    return items, nil
+}
+
+func (u *UserRepository) DeleteFromHistory(ctx context.Context, historyID uuid.UUID, userID uuid.UUID) error {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    result, err := u.db.Exec(ctx, DeleteFromHistoryQuery, historyID, userID)
+    if err != nil {
+        logger.Error("failed to delete from history: " + err.Error())
+        return users.ErrorInternalServerError
+    }
+    if result.RowsAffected() == 0 {
+        return users.ErrorNotFound
+    }
+    logger.Info("successfully deleted from search history")
+    return nil
+}
+
+func (u *UserRepository) UpdateHistoryName(ctx context.Context, historyID uuid.UUID, userID uuid.UUID, name string) error {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    result, err := u.db.Exec(ctx, UpdateHistoryNameQuery, name, historyID, userID)
+    if err != nil {
+        logger.Error("failed to update history name: " + err.Error())
+        return users.ErrorInternalServerError
+    }
+    if result.RowsAffected() == 0 {
+        return users.ErrorNotFound
+    }
+    logger.Info("successfully updated history item name")
+    return nil
+}
