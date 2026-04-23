@@ -1,0 +1,1 @@
+SELECT COUNT(*) FROM dance_likes WHERE dance_id = $1;
