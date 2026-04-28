@@ -168,18 +168,20 @@ func main() {
 	userRouter.Handle("/load",      userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDance))).Methods(http.MethodPost)
 	userRouter.Handle("/loadByURL", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDanceByURL))).Methods(http.MethodPost, http.MethodOptions)
 
-	userRouter.HandleFunc("/dance/{id}", userHandler.GetDanceByID).Methods(http.MethodGet, http.MethodOptions)
+	userRouter.HandleFunc("/dance/compare", userHandler.CompareDance).Methods(http.MethodPost, http.MethodOptions)
+	userRouter.Handle("/dance/{id}",userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.GetDanceByID),)).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/main_page", userHandler.GetMainPage).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/dance/{dance_id}/segment/{segment_idx}", userHandler.GetSegmentDescription).Methods(http.MethodGet, http.MethodOptions)
-
-
+	
+	
 	protectedUserRouter := userRouter.PathPrefix("").Subrouter()
 	protectedUserRouter.Use(userHandler.Middleware)
 	protectedUserRouter.HandleFunc("/change/password", userHandler.ChangePassword).Methods(http.MethodPut, http.MethodOptions)
 	protectedUserRouter.HandleFunc("/history", userHandler.GetSearchHistory).Methods(http.MethodGet, http.MethodOptions)
 	protectedUserRouter.HandleFunc("/history/{history_id}", userHandler.DeleteFromHistory).Methods(http.MethodDelete, http.MethodOptions)
 	protectedUserRouter.HandleFunc("/history/{history_id}", userHandler.UpdateHistoryName).Methods(http.MethodPut, http.MethodOptions)
-			
+	protectedUserRouter.HandleFunc("/dance/{id}/like", userHandler.ToggleLike).Methods(http.MethodPost, http.MethodOptions)
+
 	danceSrv := http.Server{
 		Handler: mainRouter,
 		Addr:    ":5458",

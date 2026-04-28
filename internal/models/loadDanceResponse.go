@@ -5,15 +5,17 @@ import (
 )
 
 type LoadDanceResponse struct {
-	DanceID             string   `json:"dance_id" binding:"required"`
-	FullGlbKey          string   `json:"full_glb_key" binding:"required"`
-	GlbKeys             []string `json:"glb_keys" binding:"required"`
-	SegmentsKey         string   `json:"segments_key" binding:"required"`
-	NumFrames           int      `json:"num_frames" binding:"required"`
-	NumSegments         int      `json:"num_segments" binding:"required"`
-	DurationSec         float64  `json:"duration_sec" binding:"required"`
-	NumSegmentsRendered int      `json:"num_segments_rendered" binding:"required"`
-	VideoPath			string   `json:"video_path" binding:"required"`
+    DanceID             string   `json:"dance_id"`
+    FullGlbKey          string   `json:"full_glb_key"`
+    GlbKeys             []string `json:"glb_keys"`
+    SegmentsKey         string   `json:"segments_key"`
+    NumFrames           int      `json:"num_frames"`
+    NumSegments         int      `json:"num_segments"`
+    DurationSec         float64  `json:"duration_sec"`
+    NumSegmentsRendered int      `json:"num_segments_rendered"`
+    VideoPath           string   `json:"video_path"`
+    LikesCount          int64    `json:"likes_count"`
+    IsLiked             bool     `json:"is_liked"` 
 }
 
 func (l *LoadDanceResponse) Sanitize() {

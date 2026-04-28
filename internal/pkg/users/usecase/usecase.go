@@ -268,7 +268,6 @@ func (uc *UserUsecase) enqueueProcessing(ctx context.Context, videoKey, danceID 
 func (uc *UserUsecase) waitForProcessing(ctx context.Context, taskID string, logger *slog.Logger) (*models.ProcessingResult, error) {
     statusURL := os.Getenv("ML_SERVICE_URL") + "/status/" + taskID
 
-    // Таймаут всей операции — 10 минут
     deadline := time.Now().Add(10 * time.Minute)
     client := &http.Client{Timeout: 10 * time.Second}
 
@@ -363,11 +362,11 @@ func (uc *UserUsecase) enqueueProcessingByURL(ctx context.Context, videoURL, dan
     return response.TaskID, nil
 }
 
-func (uc *UserUsecase) GetDanceByID(ctx context.Context, danceID string) (*models.UploadDanceResult, error) {
+func (uc *UserUsecase) GetDanceByID(ctx context.Context, danceID string, userID *uuid.UUID) (*models.UploadDanceResult, error) {
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
     segmentsKey := fmt.Sprintf("results/%s/segments.json", danceID)
-    
+
     data, err := uc.storageRepo.DownloadFile(ctx, segmentsKey)
     if err != nil {
         logger.Error("failed to get segments.json", "error", err)
@@ -392,7 +391,7 @@ func (uc *UserUsecase) GetDanceByID(ctx context.Context, danceID string) (*model
         glbKeys[i] = fmt.Sprintf("results/%s/segment_%d.glb", danceID, i)
     }
 
-    return &models.UploadDanceResult{
+    result := &models.UploadDanceResult{
         DanceID:             danceID,
         SegmentsKey:         segmentsKey,
         FullGlbKey:          fmt.Sprintf("results/%s/full_animation.glb", danceID),
@@ -402,27 +401,61 @@ func (uc *UserUsecase) GetDanceByID(ctx context.Context, danceID string) (*model
         NumSegmentsRendered: segments.NumSegments,
         DurationSec:         segments.Meta.DurationSec,
         VideoPath:           fmt.Sprintf("results/%s/video.mp4", danceID),
-    }, nil
-}
+    }
 
+    count, err := uc.userRepo.GetLikesCount(ctx, danceID)
+    if err == nil {
+        result.LikesCount = count
+    }
+
+    if userID != nil {
+        liked, err := uc.userRepo.IsLikedByUser(ctx, *userID, danceID)
+        if err == nil {
+            result.IsLiked = liked
+        }
+    }
+
+    return result, nil
+}
 func (uc *UserUsecase) GetMainPage(ctx context.Context) ([]models.VideoItem, error) {
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
-    danceIDs, err := uc.storageRepo.ListDances(ctx, 9)
+    // Сначала берём залайканные танцы
+    topDances, err := uc.userRepo.GetTopLikedDances(ctx, 9)
+    logger.Info("got top liked dances", topDances)
     if err != nil {
-        logger.Error("failed to list dances", "error", err)
+        logger.Error("failed to get top dances", "error", err)
         return nil, users.ErrorInternalServerError
     }
 
-    s3Address := os.Getenv("S3_ADDRESS")
-    s3Address = strings.TrimRight(s3Address, "/")
-
+    s3Address := strings.TrimRight(os.Getenv("S3_ADDRESS"), "/")
     var videos []models.VideoItem
-    for _, id := range danceIDs {
+
+    for _, d := range topDances {
         videos = append(videos, models.VideoItem{
-            ID:  id,
-            URL: fmt.Sprintf("%s/results/%s/video.mp4", s3Address, id),
+            ID:  d.DanceID,
+            URL: fmt.Sprintf("%s/results/%s/video.mp4", s3Address, d.DanceID),
         })
+    }
+
+    if len(videos) < 9 {
+        danceIDs, err := uc.storageRepo.ListDances(ctx, 9)
+        if err != nil {
+            logger.Error("failed to list dances", "error", err)
+            return nil, users.ErrorInternalServerError
+        }
+        existing := make(map[string]bool)
+        for _, v := range videos {
+            existing[v.ID] = true
+        }
+        for _, id := range danceIDs {
+            if !existing[id] && len(videos) < 9 {
+                videos = append(videos, models.VideoItem{
+                    ID:  id,
+                    URL: fmt.Sprintf("%s/results/%s/video.mp4", s3Address, id),
+                })
+            }
+        }
     }
 
     return videos, nil
@@ -501,4 +534,125 @@ func (uc *UserUsecase) UpdateHistoryName(ctx context.Context, historyID uuid.UUI
 
     logger.Info("successfully updated history name")
     return nil
+}
+
+
+func (uc *UserUsecase) ToggleLike(ctx context.Context, userID uuid.UUID, danceID string) (*models.LikeResponse, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    if danceID == "" {
+        logger.Error("empty danceID")
+        return nil, users.ErrorBadRequest
+    }
+
+    liked, err := uc.userRepo.ToggleLike(ctx, userID, danceID)
+    if err != nil {
+        return nil, err
+    }
+
+    count, err := uc.userRepo.GetLikesCount(ctx, danceID)
+    if err != nil {
+        return nil, err
+    }
+
+    return &models.LikeResponse{
+        DanceID:    danceID,
+        Liked:      liked,
+        LikesCount: count,
+    }, nil
+}
+
+
+func (uc *UserUsecase) GetTopLikedDances(ctx context.Context, limit int) ([]models.DanceLikeStat, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    if limit <= 0 || limit > 50 {
+        limit = 9
+    }
+    stats, err := uc.userRepo.GetTopLikedDances(ctx, limit)
+    if err != nil {
+        logger.Error("failed to get top dances", "error", err)
+        return nil, err
+    }
+    return stats, nil
+}
+
+func (uc *UserUsecase) CompareDance(ctx context.Context, videoKey string, danceID string, segmentIdx int) (*models.DanceCompareResponse, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    if videoKey == "" || danceID == "" {
+        logger.Error("videoKey or danceID is empty")
+        return nil, users.ErrorBadRequest
+    }
+
+    taskID, err := uc.enqueueCompare(ctx, videoKey, danceID, segmentIdx)
+    if err != nil {
+        logger.Error("failed to enqueue compare", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    result, err := uc.waitForCompare(ctx, taskID, logger)
+    if err != nil {
+        logger.Error("compare failed", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    return result, nil
+}
+
+func (uc *UserUsecase) enqueueCompare(ctx context.Context, videoKey, danceID string, segmentIdx int) (string, error) {
+    compareURL := os.Getenv("ML_SERVICE_URL") + "/dance_compare"
+    requestBody := map[string]interface{}{
+        "video_key":   videoKey,
+        "dance_id":    danceID,
+        "segment_idx": segmentIdx,
+    }
+
+    jsonBody, _ := json.Marshal(requestBody)
+    client := &http.Client{Timeout: 20 * time.Second}
+
+    resp, err := client.Post(compareURL, "application/json", bytes.NewBuffer(jsonBody))
+    if err != nil {
+        return "", err
+    }
+    defer resp.Body.Close()
+
+    var response struct {
+        TaskID string `json:"task_id"`
+    }
+    json.NewDecoder(resp.Body).Decode(&response)
+    return response.TaskID, nil
+}
+
+func (uc *UserUsecase) waitForCompare(ctx context.Context, taskID string, logger *slog.Logger) (*models.DanceCompareResponse, error) {
+    statusURL := os.Getenv("ML_SERVICE_URL") + "/status/" + taskID
+    deadline := time.Now().Add(10 * time.Minute)
+    client := &http.Client{Timeout: 10 * time.Second}
+
+    for time.Now().Before(deadline) {
+        time.Sleep(5 * time.Second)
+
+        resp, err := client.Get(statusURL)
+        if err != nil {
+            logger.Warn("status check failed", "error", err)
+            continue
+        }
+
+        var status struct {
+            Status string                      `json:"status"`
+            Result *models.DanceCompareResponse `json:"result,omitempty"`
+        }
+        json.NewDecoder(resp.Body).Decode(&status)
+        resp.Body.Close()
+
+        logger.Info("compare status", "status", status.Status)
+
+        switch status.Status {
+        case "done":
+            return status.Result, nil
+        case "failed":
+            return nil, fmt.Errorf("compare failed")
+        }
+    }
+
+    return nil, fmt.Errorf("compare timeout")
 }

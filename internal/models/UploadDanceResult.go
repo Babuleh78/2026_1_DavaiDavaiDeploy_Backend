@@ -9,5 +9,7 @@ type UploadDanceResult struct {
     NumSegments         int
     NumSegmentsRendered int
     DurationSec         float64
+    LikesCount          int64
+    IsLiked             bool
 
 }
