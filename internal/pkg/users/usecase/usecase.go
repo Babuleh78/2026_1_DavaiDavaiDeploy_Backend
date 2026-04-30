@@ -438,8 +438,8 @@ func (uc *UserUsecase) GetMainPage(ctx context.Context) ([]models.VideoItem, err
         })
     }
 
-    if len(videos) < 9 {
-        danceIDs, err := uc.storageRepo.ListDances(ctx, 9)
+    if len(videos) < 14 {
+        danceIDs, err := uc.storageRepo.ListDances(ctx, 14)
         if err != nil {
             logger.Error("failed to list dances", "error", err)
             return nil, users.ErrorInternalServerError
@@ -449,7 +449,7 @@ func (uc *UserUsecase) GetMainPage(ctx context.Context) ([]models.VideoItem, err
             existing[v.ID] = true
         }
         for _, id := range danceIDs {
-            if !existing[id] && len(videos) < 9 {
+            if !existing[id] && len(videos) < 14 {
                 videos = append(videos, models.VideoItem{
                     ID:  id,
                     URL: fmt.Sprintf("%s/results/%s/video.mp4", s3Address, id),
