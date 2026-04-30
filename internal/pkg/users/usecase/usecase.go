@@ -421,7 +421,7 @@ func (uc *UserUsecase) GetMainPage(ctx context.Context) ([]models.VideoItem, err
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
     // Сначала берём залайканные танцы
-    topDances, err := uc.userRepo.GetTopLikedDances(ctx, 9)
+    topDances, err := uc.userRepo.GetTopLikedDances(ctx, 14)
     logger.Info("got top liked dances", topDances)
     if err != nil {
         logger.Error("failed to get top dances", "error", err)
