@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_DB: DDDance
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
       ML_SERVICE_URL: ${ML_SERVICE_URL:-}
     
     volumes:
@@ -28,8 +28,7 @@ services:
       dockerfile: ./build/main.Dockerfile
     container_name: main
     restart: unless-stopped
-    ports:
-      - "${MAIN_PORT:-5458}:5458"
+  
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_NAME: ${DB_NAME:-DDDance}
@@ -59,8 +58,7 @@ services:
       dockerfile: ./build/auth.Dockerfile
     container_name: auth
     restart: unless-stopped
-    ports:
-      - "${AUTH_PORT:-5459}:5459"
+  
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_NAME: ${DB_NAME:-DDDance}
