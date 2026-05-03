@@ -3,14 +3,17 @@ services:
     build:
       context: .
       dockerfile: ./build/pg.Dockerfile
+    env_file:
+      - .env
     container_name: postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: DDDance
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
       ML_SERVICE_URL: ${ML_SERVICE_URL:-}
-    
+    expose:
+      - "5432"
     volumes:
       - ./build/sql/:/docker-entrypoint-initdb.d/
       - postgres_data:/var/lib/postgresql/data
@@ -26,31 +29,22 @@ services:
     build:
       context: .
       dockerfile: ./build/main.Dockerfile
-
-  
+    ports:
+      - 5458:5458
     container_name: main
     restart: unless-stopped
   
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_NAME: ${DB_NAME:-DDDance}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
       DB_PORT: ${DB_PORT:-5432}
       AUTH_SERVICE_HOST: ${AUTH_SERVICE_HOST:-auth}
-      AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT:-5459}
-      JWT_SECRET: ${JWT_SECRET:-}
-      COOKIE_SECURE: ${COOKIE_SECURE:-}
-      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-}
-      S3_ADDRESS: ${S3_ADDRESS:-}
-      AWS_S3_ENDPOINT: ${AWS_S3_ENDPOINT:-}
-      AWS_S3_BUCKET: ${AWS_S3_BUCKET:-dddance}
-      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
-      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
       ML_SERVICE_URL: ${ML_SERVICE_URL:-}
     depends_on:
       postgres:
         condition: service_healthy
+      auth:
+        condition: service_started
     networks:
       - ddd-network
 
@@ -58,18 +52,14 @@ services:
     build:
       context: .
       dockerfile: ./build/auth.Dockerfile
-    container_name: auth
+    expose:
+      - "5459"
     restart: unless-stopped
   
     environment:
       DB_HOST: ${DB_HOST:-postgres}
       DB_NAME: ${DB_NAME:-DDDance}
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres123}
       DB_PORT: ${DB_PORT:-5432}
-      JWT_SECRET: ${JWT_SECRET:-}
-      COOKIE_SECURE: ${COOKIE_SECURE:-}
-      COOKIE_SAMESITE: ${COOKIE_SAMESITE:-}
     depends_on:
       postgres:
         condition: service_healthy

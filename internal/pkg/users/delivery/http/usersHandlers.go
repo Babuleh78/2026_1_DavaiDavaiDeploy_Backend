@@ -203,7 +203,8 @@ func (u *UserHandler) GetUser(w http.ResponseWriter, r *http.Request) {
 // @Router       /users/change/password [put]
 func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
-	userID, ok := r.Context().Value(users.UserKey).(uuid.UUID)
+	neededUser, ok := r.Context().Value(users.UserKey).(models.User)
+
 	if !ok {
 		log.LogHandlerError(logger, errors.New("user unauthorized"), http.StatusUnauthorized)
 		helpers.WriteError(w, http.StatusUnauthorized)
@@ -222,7 +223,7 @@ func (u *UserHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	user, err := u.client.ChangePassword(r.Context(), &gen.ChangePasswordRequest{
 		OldPassword: req.OldPassword,
 		NewPassword: req.NewPassword,
-		UserID:      userID.String()})
+		UserID:      neededUser.ID.String()})
 
 	if err != nil {
 		st, _ := status.FromError(err)
@@ -444,48 +445,49 @@ func (u *UserHandler) LoadDanceByURL(w http.ResponseWriter, r *http.Request) {
 // @Failure      500  {string}  string  "Внутренняя ошибка сервера"
 // @Router       /users/dance/{id} [get]
 func (u *UserHandler) GetDanceByID(w http.ResponseWriter, r *http.Request) {
-    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 
-    danceID := mux.Vars(r)["id"]
-    if danceID == "" {
-        helpers.WriteError(w, http.StatusBadRequest)
-        return
-    }
+	danceID := mux.Vars(r)["id"]
+	if danceID == "" {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
 
-    // Получаем userID опционально
-    var userID *uuid.UUID
-    if user := getUserFromContext(r.Context()); user != nil {
-        userID = &user.ID
-    }
+	// Получаем userID опционально
+	var userID *uuid.UUID
+	if user := getUserFromContext(r.Context()); user != nil {
+		userID = &user.ID
+	}
 
-    result, err := u.uc.GetDanceByID(r.Context(), danceID, userID) // передаём userID
-    if err != nil {
-        switch err {
-        case users.ErrorNotFound:
-            helpers.WriteError(w, http.StatusNotFound)
-        default:
-            helpers.WriteError(w, http.StatusInternalServerError)
-        }
-        return
-    }
+	result, err := u.uc.GetDanceByID(r.Context(), danceID, userID) // передаём userID
+	if err != nil {
+		switch err {
+		case users.ErrorNotFound:
+			helpers.WriteError(w, http.StatusNotFound)
+		default:
+			helpers.WriteError(w, http.StatusInternalServerError)
+		}
+		return
+	}
 
-    response := models.LoadDanceResponse{
-        DanceID:             result.DanceID,
-        FullGlbKey:          result.FullGlbKey,
-        GlbKeys:             result.GlbKeys,
-        SegmentsKey:         result.SegmentsKey,
-        NumFrames:           result.NumFrames,
-        NumSegments:         result.NumSegments,
-        DurationSec:         result.DurationSec,
-        NumSegmentsRendered: result.NumSegmentsRendered,
-        VideoPath:           result.VideoPath,
-        LikesCount:          result.LikesCount, 
-        IsLiked:             result.IsLiked,
-    }
+	response := models.LoadDanceResponse{
+		DanceID:             result.DanceID,
+		FullGlbKey:          result.FullGlbKey,
+		GlbKeys:             result.GlbKeys,
+		SegmentsKey:         result.SegmentsKey,
+		NumFrames:           result.NumFrames,
+		NumSegments:         result.NumSegments,
+		DurationSec:         result.DurationSec,
+		NumSegmentsRendered: result.NumSegmentsRendered,
+		VideoPath:           result.VideoPath,
+		LikesCount:          result.LikesCount,
+		IsLiked:             result.IsLiked,
+	}
 
-    helpers.WriteJSON(w, response)
-    log.LogHandlerInfo(logger, "success", http.StatusOK)
+	helpers.WriteJSON(w, response)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
+
 // GetMainPage godoc
 // @Summary      Получить список танцев для главной страницы
 // @Description  Возвращает массив танцев (возможно, популярных или недавних)
@@ -569,25 +571,27 @@ func (u *UserHandler) GetSegmentDescription(w http.ResponseWriter, r *http.Reque
 // OptionalAuthMiddleware godoc
 // @Summary      Middleware опциональной аутентификации
 // @Description  Пытается извлечь пользователя из JWT-куки, при успехе добавляет в контекст.
-//               Если токена нет или он невалиден — запрос продолжается без пользователя.
+//
+//	Если токена нет или он невалиден — запрос продолжается без пользователя.
+//
 // @Tags         internal
 // @Security     OptionalAuth
 func (h *UserHandler) OptionalAuthMiddleware(next http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        cookie, err := r.Cookie(CookieName)
-        if err == nil && cookie.Value != "" {
-            user, err := h.client.ValidateAndGetUser(r.Context(), &gen.ValidateAndGetUserRequest{Token: cookie.Value})
-            if err == nil {
-                neededUser := models.User{
-                    ID: uuid.FromStringOrNil(user.ID),
-                }
-                ctx := context.WithValue(r.Context(), users.UserKey, neededUser)
-                next.ServeHTTP(w, r.WithContext(ctx))
-                return
-            }
-        }
-        next.ServeHTTP(w, r)
-    })
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cookie, err := r.Cookie(CookieName)
+		if err == nil && cookie.Value != "" {
+			user, err := h.client.ValidateAndGetUser(r.Context(), &gen.ValidateAndGetUserRequest{Token: cookie.Value})
+			if err == nil {
+				neededUser := models.User{
+					ID: uuid.FromStringOrNil(user.ID),
+				}
+				ctx := context.WithValue(r.Context(), users.UserKey, neededUser)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // GetSearchHistory godoc
@@ -601,20 +605,20 @@ func (h *UserHandler) OptionalAuthMiddleware(next http.Handler) http.Handler {
 // @Failure      500  {string}  string  "Внутренняя ошибка сервера"
 // @Router       /users/history [get]
 func (h *UserHandler) GetSearchHistory(w http.ResponseWriter, r *http.Request) {
-    user := getUserFromContext(r.Context())
-    if user == nil {
-        http.Error(w, "unauthorized", http.StatusUnauthorized)
-        return
-    }
-    items, err := h.uc.GetHistory(r.Context(), user.ID)
-    if err != nil {
-        http.Error(w, "internal error", http.StatusInternalServerError)
-        return
-    }
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	items, err := h.uc.GetHistory(r.Context(), user.ID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
 
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(http.StatusOK)
-    json.NewEncoder(w).Encode(items)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(items)
 }
 
 func getUserFromContext(ctx context.Context) *models.User {
@@ -690,26 +694,26 @@ func convertToH264(input []byte) ([]byte, error) {
 // @Failure      500         {string}  string  "Внутренняя ошибка сервера"
 // @Router       /users/history/{history_id} [delete]
 func (h *UserHandler) DeleteFromHistory(w http.ResponseWriter, r *http.Request) {
-    user := getUserFromContext(r.Context())
-    if user == nil {
-        http.Error(w, "unauthorized", http.StatusUnauthorized)
-        return
-    }
-    historyID := uuid.FromStringOrNil(mux.Vars(r)["history_id"])
-    if historyID == uuid.Nil {
-        http.Error(w, "invalid history_id", http.StatusBadRequest)
-        return
-    }
-    err := h.uc.DeleteFromHistory(r.Context(), historyID, user.ID)
-    if err != nil {
-        if err == users.ErrorNotFound {
-            http.Error(w, "not found", http.StatusNotFound)
-            return
-        }
-        http.Error(w, "internal error", http.StatusInternalServerError)
-        return
-    }
-    w.WriteHeader(http.StatusNoContent)
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	historyID := uuid.FromStringOrNil(mux.Vars(r)["history_id"])
+	if historyID == uuid.Nil {
+		http.Error(w, "invalid history_id", http.StatusBadRequest)
+		return
+	}
+	err := h.uc.DeleteFromHistory(r.Context(), historyID, user.ID)
+	if err != nil {
+		if err == users.ErrorNotFound {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // UpdateHistoryName godoc
@@ -727,33 +731,32 @@ func (h *UserHandler) DeleteFromHistory(w http.ResponseWriter, r *http.Request) 
 // @Failure      500         {string}  string  "Внутренняя ошибка сервера"
 // @Router       /users/history/{history_id} [put]
 func (h *UserHandler) UpdateHistoryName(w http.ResponseWriter, r *http.Request) {
-    user := getUserFromContext(r.Context())
-    if user == nil {
-        http.Error(w, "unauthorized", http.StatusUnauthorized)
-        return
-    }
-    historyID := uuid.FromStringOrNil(mux.Vars(r)["history_id"])
-    if historyID == uuid.Nil {
-        http.Error(w, "invalid history_id", http.StatusBadRequest)
-        return
-    }
-    var input models.UpdateHistoryNameInput
-    if err := json.NewDecoder(r.Body).Decode(&input); err != nil || input.Name == "" {
-        http.Error(w, "invalid body", http.StatusBadRequest)
-        return
-    }
-    err := h.uc.UpdateHistoryName(r.Context(), historyID, user.ID, input.Name)
-    if err != nil {
-        if err == users.ErrorNotFound {
-            http.Error(w, "not found", http.StatusNotFound)
-            return
-        }
-        http.Error(w, "internal error", http.StatusInternalServerError)
-        return
-    }
-    w.WriteHeader(http.StatusNoContent)
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	historyID := uuid.FromStringOrNil(mux.Vars(r)["history_id"])
+	if historyID == uuid.Nil {
+		http.Error(w, "invalid history_id", http.StatusBadRequest)
+		return
+	}
+	var input models.UpdateHistoryNameInput
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil || input.Name == "" {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	err := h.uc.UpdateHistoryName(r.Context(), historyID, user.ID, input.Name)
+	if err != nil {
+		if err == users.ErrorNotFound {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
-
 
 // ToggleLike godoc
 // @Summary      Поставить или снять лайк с танца
@@ -767,35 +770,36 @@ func (h *UserHandler) UpdateHistoryName(w http.ResponseWriter, r *http.Request) 
 // @Failure      500  {string}  string  "Внутренняя ошибка сервера"
 // @Router       /users/dance/{id}/like [post]
 func (h *UserHandler) ToggleLike(w http.ResponseWriter, r *http.Request) {
-    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 
-    user := getUserFromContext(r.Context())
-    if user == nil {
-        helpers.WriteError(w, http.StatusUnauthorized)
-        return
-    }
+	user := getUserFromContext(r.Context())
+	if user == nil {
+		helpers.WriteError(w, http.StatusUnauthorized)
+		return
+	}
 
-    danceID := mux.Vars(r)["id"]
-    if danceID == "" {
-        helpers.WriteError(w, http.StatusBadRequest)
-        return
-    }
+	danceID := mux.Vars(r)["id"]
+	if danceID == "" {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
 
-    result, err := h.uc.ToggleLike(r.Context(), user.ID, danceID)
-    if err != nil {
-        helpers.WriteError(w, http.StatusInternalServerError)
-        return
-    }
+	result, err := h.uc.ToggleLike(r.Context(), user.ID, danceID)
+	if err != nil {
+		helpers.WriteError(w, http.StatusInternalServerError)
+		return
+	}
 
-    helpers.WriteJSON(w, result)
-    log.LogHandlerInfo(logger, "success", http.StatusOK)
+	helpers.WriteJSON(w, result)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
-
 
 // CompareDance godoc
 // @Summary      Сравнить танец пользователя с оригиналом
 // @Description  Загружает видео пользователя и сравнивает с указанным танцем по сегменту.
-//               segment_idx = -1 означает сравнение всего видео целиком.
+//
+//	segment_idx = -1 означает сравнение всего видео целиком.
+//
 // @Tags         dances
 // @Accept       json
 // @Produce      json
@@ -805,36 +809,36 @@ func (h *UserHandler) ToggleLike(w http.ResponseWriter, r *http.Request) {
 // @Failure      500    {string}  string  "Внутренняя ошибка сервера"
 // @Router       /users/dance/compare [post]
 func (u *UserHandler) CompareDance(w http.ResponseWriter, r *http.Request) {
-    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 
-    var input models.DanceCompareRequest
-    if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-        log.LogHandlerError(logger, err, http.StatusBadRequest)
-        helpers.WriteError(w, http.StatusBadRequest)
-        return
-    }
+	var input models.DanceCompareRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		log.LogHandlerError(logger, err, http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
 
-    if input.VideoKey == "" || input.DanceID == "" {
-        log.LogHandlerError(logger, errors.New("video_key and dance_id are required"), http.StatusBadRequest)
-        helpers.WriteError(w, http.StatusBadRequest)
-        return
-    }
+	if input.VideoKey == "" || input.DanceID == "" {
+		log.LogHandlerError(logger, errors.New("video_key and dance_id are required"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
 
-    if input.SegmentIdx == 0 {
-        input.SegmentIdx = -1
-    }
+	if input.SegmentIdx == 0 {
+		input.SegmentIdx = -1
+	}
 
-    result, err := u.uc.CompareDance(r.Context(), input.VideoKey, input.DanceID, input.SegmentIdx)
-    if err != nil {
-        switch err {
-        case users.ErrorBadRequest:
-            helpers.WriteError(w, http.StatusBadRequest)
-        default:
-            helpers.WriteError(w, http.StatusInternalServerError)
-        }
-        return
-    }
+	result, err := u.uc.CompareDance(r.Context(), input.VideoKey, input.DanceID, input.SegmentIdx)
+	if err != nil {
+		switch err {
+		case users.ErrorBadRequest:
+			helpers.WriteError(w, http.StatusBadRequest)
+		default:
+			helpers.WriteError(w, http.StatusInternalServerError)
+		}
+		return
+	}
 
-    helpers.WriteJSON(w, result)
-    log.LogHandlerInfo(logger, "success", http.StatusOK)
+	helpers.WriteJSON(w, result)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
