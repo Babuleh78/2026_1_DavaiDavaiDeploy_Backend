@@ -6,6 +6,7 @@
 package main
 
 import (
+	_ "DDDance/docs"
 	"context"
 	"crypto/tls"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
-	_ "DDDance/docs"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
@@ -28,8 +28,8 @@ import (
 	httpSwagger "github.com/swaggo/http-swagger"
 	"google.golang.org/grpc"
 
-	authHandlers "DDDance/internal/pkg/auth/delivery/http"
 	authGen "DDDance/internal/pkg/auth/delivery/grpc/gen"
+	authHandlers "DDDance/internal/pkg/auth/delivery/http"
 	authRepo "DDDance/internal/pkg/auth/repo"
 	authUsecase "DDDance/internal/pkg/auth/usecase"
 	"DDDance/internal/pkg/middleware/cors"
@@ -158,6 +158,7 @@ func main() {
 	authRouter := apiRouter.PathPrefix("/auth").Subrouter()
 	authRouter.HandleFunc("/signup", authHandler.SignupUser).Methods(http.MethodPost, http.MethodOptions)
 	authRouter.HandleFunc("/signin", authHandler.SignInUser).Methods(http.MethodPost, http.MethodOptions)
+	authRouter.HandleFunc("/vk", authHandler.VKAuth).Methods(http.MethodPost, http.MethodOptions)
 
 	protectedAuthRouter := authRouter.PathPrefix("").Subrouter()
 	protectedAuthRouter.Use(authHandler.Middleware)
@@ -169,11 +170,10 @@ func main() {
 	userRouter.Handle("/loadByURL", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDanceByURL))).Methods(http.MethodPost, http.MethodOptions)
 
 	userRouter.HandleFunc("/dance/compare", userHandler.CompareDance).Methods(http.MethodPost, http.MethodOptions)
-	userRouter.Handle("/dance/{id}",userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.GetDanceByID),)).Methods(http.MethodGet, http.MethodOptions)
+	userRouter.Handle("/dance/{id}", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.GetDanceByID))).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/main_page", userHandler.GetMainPage).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/dance/{dance_id}/segment/{segment_idx}", userHandler.GetSegmentDescription).Methods(http.MethodGet, http.MethodOptions)
-	
-	
+
 	protectedUserRouter := userRouter.PathPrefix("").Subrouter()
 	protectedUserRouter.Use(userHandler.Middleware)
 	protectedUserRouter.HandleFunc("/change/password", userHandler.ChangePassword).Methods(http.MethodPut, http.MethodOptions)

@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: ./build/pg.Dockerfile
+    env_file:
+      - .env
     container_name: postgres
     restart: unless-stopped
     env_file:
@@ -36,6 +38,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      auth:
+        condition: service_started
     networks:
       - ddd-network
 
@@ -43,7 +47,8 @@ services:
     build:
       context: .
       dockerfile: ./build/auth.Dockerfile
-    container_name: auth
+    expose:
+      - "5459"
     restart: unless-stopped
     env_file:
       - .env

@@ -156,6 +156,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/vk": {
+            "post": {
+                "description": "Authenticate or register user via VK. If login is provided - registers new user, otherwise signs in existing user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "VK authentication",
+                "parameters": [
+                    {
+                        "description": "VK auth data",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.VKAuthRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.User"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "412": {
+                        "description": "Precondition Failed"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/users/change/password": {
             "put": {
                 "security": [
@@ -206,6 +252,52 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Пользователь не найден",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/dance/compare": {
+            "post": {
+                "description": "Загружает видео пользователя и сравнивает с указанным танцем по сегменту.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "dances"
+                ],
+                "summary": "Сравнить танец пользователя с оригиналом",
+                "parameters": [
+                    {
+                        "description": "Параметры сравнения",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.DanceCompareRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.DanceCompareResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Неверные параметры запроса",
                         "schema": {
                             "type": "string"
                         }
@@ -311,6 +403,55 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Танец не найден",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Внутренняя ошибка сервера",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/dance/{id}/like": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Если лайк уже стоит — снимает его, если нет — ставит. Один пользователь может поставить только один лайк.",
+                "tags": [
+                    "dances"
+                ],
+                "summary": "Поставить или снять лайк с танца",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ID танца",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.LikeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Не указан ID танца",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "401": {
+                        "description": "Пользователь не авторизован",
                         "schema": {
                             "type": "string"
                         }
@@ -687,6 +828,60 @@ const docTemplate = `{
                 }
             }
         },
+        "models.DanceCompareRequest": {
+            "type": "object",
+            "properties": {
+                "dance_id": {
+                    "type": "string"
+                },
+                "segment_idx": {
+                    "type": "integer"
+                },
+                "video_key": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.DanceCompareResponse": {
+            "type": "object",
+            "properties": {
+                "dance_id": {
+                    "type": "string"
+                },
+                "overall_score": {
+                    "type": "number"
+                },
+                "segment_idx": {
+                    "type": "integer"
+                },
+                "segments": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.SegmentCompareDetail"
+                    }
+                },
+                "weakest_metrics": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "models.LikeResponse": {
+            "type": "object",
+            "properties": {
+                "dance_id": {
+                    "type": "string"
+                },
+                "liked": {
+                    "type": "boolean"
+                },
+                "likes_count": {
+                    "type": "integer"
+                }
+            }
+        },
         "models.LoadDanceByURLInput": {
             "type": "object",
             "properties": {
@@ -697,17 +892,6 @@ const docTemplate = `{
         },
         "models.LoadDanceResponse": {
             "type": "object",
-            "required": [
-                "dance_id",
-                "duration_sec",
-                "full_glb_key",
-                "glb_keys",
-                "num_frames",
-                "num_segments",
-                "num_segments_rendered",
-                "segments_key",
-                "video_path"
-            ],
             "properties": {
                 "dance_id": {
                     "type": "string"
@@ -723,6 +907,12 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
+                },
+                "is_liked": {
+                    "type": "boolean"
+                },
+                "likes_count": {
+                    "type": "integer"
                 },
                 "num_frames": {
                     "type": "integer"
@@ -775,6 +965,46 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "string"
+                }
+            }
+        },
+        "models.SegmentCompareDetail": {
+            "type": "object",
+            "properties": {
+                "dtw_scores": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "joint_angles_diff": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "number",
+                        "format": "float64"
+                    }
+                },
+                "rom_diff": {
+                    "type": "number"
+                },
+                "segment_idx": {
+                    "type": "integer"
+                },
+                "segment_score": {
+                    "type": "number"
+                },
+                "smoothness_diff": {
+                    "type": "number"
+                },
+                "symmetry_diff": {
+                    "type": "number"
+                },
+                "tempo_diff": {
+                    "type": "number"
+                },
+                "velocity_diff": {
+                    "type": "number"
                 }
             }
         },
@@ -867,6 +1097,17 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "models.VKAuthRequest": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "login": {
+                    "type": "string"
                 }
             }
         },
