@@ -165,7 +165,7 @@ func main() {
 	protectedAuthRouter.HandleFunc("/logout", authHandler.LogOutUser).Methods(http.MethodPost, http.MethodOptions)
 
 	userRouter := apiRouter.PathPrefix("/users").Subrouter()
-	userRouter.Handle("/load",      userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDance))).Methods(http.MethodPost)
+	userRouter.Handle("/load", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDance))).Methods(http.MethodPost, http.MethodOptions)
 	userRouter.Handle("/loadByURL", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDanceByURL))).Methods(http.MethodPost, http.MethodOptions)
 
 	userRouter.HandleFunc("/dance/compare", userHandler.CompareDance).Methods(http.MethodPost, http.MethodOptions)

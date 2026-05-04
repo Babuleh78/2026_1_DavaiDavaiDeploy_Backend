@@ -31,3 +31,6 @@ CREATE TABLE IF NOT EXISTS dance_likes (
 );
 
 CREATE INDEX IF NOT EXISTS dance_likes_dance_id_idx ON dance_likes(dance_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_history_user_dance 
+ON search_history (user_id, dance_id);

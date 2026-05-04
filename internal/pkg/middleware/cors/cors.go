@@ -32,6 +32,7 @@ func CorsMiddleware(next http.Handler) http.Handler {
     allowedOrigins := []string{
         "http://localhost",
         "http://127.0.0.1",
+        "http://localhost:5173",
         "http://host.docker.internal", // Mac
     }
 
@@ -51,11 +52,12 @@ func CorsMiddleware(next http.Handler) http.Handler {
             w.Header().Set("Vary", "Origin")
         }
 
-        w.Header().Set("Access-Control-Allow-Methods", "POST,GET,OPTIONS")
+        w.Header().Set("Access-Control-Allow-Methods", "POST,GET,PUT,DELETE,OPTIONS")
         w.Header().Set("Access-Control-Allow-Headers", "Authorization,Content-Type,X-Csrf-Token")
         w.Header().Set("Access-Control-Allow-Credentials", "true")
         w.Header().Set("Access-Control-Expose-Headers", "Authorization,X-Csrf-Token")
         w.Header().Set("Access-Control-Max-Age", "86400")
+        
 
         if r.Method == http.MethodOptions {
             w.WriteHeader(http.StatusOK)

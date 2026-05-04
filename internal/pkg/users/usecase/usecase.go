@@ -413,10 +413,16 @@ func (uc *UserUsecase) GetDanceByID(ctx context.Context, danceID string, userID 
         if err == nil {
             result.IsLiked = liked
         }
+
+        if err := uc.userRepo.AddToHistory(ctx, *userID, danceID, ""); err != nil {
+            logger.Warn("failed to add to history", "error", err)
+
+        }
     }
 
     return result, nil
 }
+
 func (uc *UserUsecase) GetMainPage(ctx context.Context) ([]models.VideoItem, error) {
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
