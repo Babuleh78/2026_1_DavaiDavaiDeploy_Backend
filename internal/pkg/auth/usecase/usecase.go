@@ -197,36 +197,9 @@ func (uc *AuthUsecase) SignInUser(ctx context.Context, req models.SignInInput) (
 		return models.User{}, "", err
 	}
 
-	secretCode := uc.authRepo.GetUserSecretCode(ctx, neededUser.ID)
-	if secretCode == "" {
-		if !CheckPass(neededUser.PasswordHash, req.Password) {
-			logger.Error("wrong password")
-			return models.User{}, "", auth.ErrorBadRequest
-		}
-
-		token, err := uc.GenerateToken(neededUser.ID, req.Login, neededUser.Version)
-		if err != nil {
-			logger.Error("cannot generate token")
-			return models.User{}, "", auth.ErrorInternalServerError
-		}
-
-		return neededUser, token, nil
-	}
-
-	if req.Code == nil || *req.Code == "" {
-		logger.Warn("no code given")
-		return models.User{}, "", auth.ErrorPreconditionFailed
-	}
-
 	if !CheckPass(neededUser.PasswordHash, req.Password) {
 		logger.Error("wrong password")
 		return models.User{}, "", auth.ErrorBadRequest
-	}
-
-	err = uc.VerifyOTPCode(ctx, neededUser.Login, secretCode, *req.Code)
-	if err != nil {
-		logger.Error("OTP authentication error: " + err.Error())
-		return models.User{}, "", auth.ErrorUnauthorized
 	}
 
 	token, err := uc.GenerateToken(neededUser.ID, req.Login, neededUser.Version)
@@ -235,7 +208,6 @@ func (uc *AuthUsecase) SignInUser(ctx context.Context, req models.SignInInput) (
 		return models.User{}, "", auth.ErrorInternalServerError
 	}
 
-	neededUser.Has2FA = true
 	return neededUser, token, nil
 }
 

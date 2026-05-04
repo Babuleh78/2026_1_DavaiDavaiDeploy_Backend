@@ -7,5 +7,5 @@ func (c contextKey) String() string {
 }
 
 const (
-	UserKey contextKey = "user_id"
+	UserKey contextKey = "user"
 )
