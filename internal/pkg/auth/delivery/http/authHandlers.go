@@ -278,18 +278,20 @@ func (a *AuthHandler) VKAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	logger.Info("VK API raw response", "body", string(bodyBytes))
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		log.LogHandlerError(logger, errors.New("VK API error: "+string(body)), http.StatusBadRequest)
+	var vkUser models.VKAuthResponse
+	err = json.Unmarshal(bodyBytes, &vkUser)
+	if err != nil {
+		log.LogHandlerError(logger, errors.New("Decoding error"), http.StatusBadRequest)
 		helpers.WriteError(w, http.StatusBadRequest)
 		return
 	}
 
-	var vkUser models.VKAuthResponse
-	err = json.NewDecoder(resp.Body).Decode(&vkUser)
-	if err != nil {
-		log.LogHandlerError(logger, errors.New("Decoding error"), http.StatusBadRequest)
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.LogHandlerError(logger, errors.New("VK API error: "+string(body)), http.StatusBadRequest)
 		helpers.WriteError(w, http.StatusBadRequest)
 		return
 	}
@@ -550,3 +552,4 @@ func (a *AuthHandler) LogOutUser(w http.ResponseWriter, r *http.Request) {
 
 	log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
+

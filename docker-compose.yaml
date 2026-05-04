@@ -3,8 +3,6 @@ services:
     build:
       context: .
       dockerfile: ./build/pg.Dockerfile
-    env_file:
-      - .env
     container_name: postgres
     restart: unless-stopped
     env_file:
@@ -32,6 +30,8 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    ports:
+      - "127.0.0.1:5458:5458"
     environment:
       AUTH_SERVICE_HOST: auth
       AUTH_SERVICE_PORT: 5459
