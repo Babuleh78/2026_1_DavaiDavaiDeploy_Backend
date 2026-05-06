@@ -172,7 +172,7 @@ func main() {
 	userRouter.HandleFunc("/dance/compare", userHandler.CompareDance).Methods(http.MethodPost, http.MethodOptions)
 	userRouter.Handle("/dance/{id}", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.GetDanceByID))).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/main_page", userHandler.GetMainPage).Methods(http.MethodGet, http.MethodOptions)
-	userRouter.HandleFunc("/dance/{dance_id}/segment/{segment_idx}", userHandler.GetSegmentDescription).Methods(http.MethodGet, http.MethodOptions)
+	userRouter.HandleFunc("/dance/{dance_id}/segment/{segment_idx}", userHandler.GetSegmentDescription).Methods(http.MethodGet)
 
 	protectedUserRouter := userRouter.PathPrefix("").Subrouter()
 	protectedUserRouter.Use(userHandler.Middleware)
@@ -181,6 +181,7 @@ func main() {
 	protectedUserRouter.HandleFunc("/history/{history_id}", userHandler.DeleteFromHistory).Methods(http.MethodDelete, http.MethodOptions)
 	protectedUserRouter.HandleFunc("/history/{history_id}", userHandler.UpdateHistoryName).Methods(http.MethodPut, http.MethodOptions)
 	protectedUserRouter.HandleFunc("/dance/{id}/like", userHandler.ToggleLike).Methods(http.MethodPost, http.MethodOptions)
+	protectedUserRouter.HandleFunc("/likes", userHandler.GetUserLikedDances).Methods(http.MethodGet, http.MethodOptions)
 
 	danceSrv := http.Server{
 		Handler: mainRouter,

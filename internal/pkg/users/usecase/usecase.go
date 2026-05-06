@@ -74,7 +74,19 @@ func (uc *UserUsecase) ParseToken(token string) (*jwt.Token, error) {
 }
 
 func (uc *UserUsecase) AddToHistory(ctx context.Context, userID uuid.UUID, danceID string, sourceURL string) error {
-    return uc.userRepo.AddToHistory(ctx, userID, danceID, sourceURL)
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    
+    err := uc.pgRepo.AddToHistory(ctx, userID, danceID, sourceURL)
+    if err != nil {
+        logger.Error("failed to add to history", "error", err)
+        return err
+    }
+
+    if err := uc.pgRepo.CleanHistory(ctx, userID); err != nil {
+        logger.Error("failed to clean history", "error", err)
+    }
+
+    return nil
 }
 
 func (uc *UserUsecase) GetHistory(ctx context.Context, userID uuid.UUID) ([]models.SearchHistoryItem, error) {
@@ -661,4 +673,14 @@ func (uc *UserUsecase) waitForCompare(ctx context.Context, taskID string, logger
     }
 
     return nil, fmt.Errorf("compare timeout")
+}
+
+func (uc *UserUsecase) GetUserLikedDances(ctx context.Context, userID uuid.UUID) ([]models.DanceLike, error){
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    likes, err := uc.userRepo.GetUserLikedDances(ctx, userID)
+    if err != nil {
+        logger.Error("failed to get liked dances", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+    return likes, nil
 }

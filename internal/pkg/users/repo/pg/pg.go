@@ -210,3 +210,35 @@ func (u *UserRepository) GetTopLikedDances(ctx context.Context, limit int) ([]mo
     }
     return stats, nil
 }
+
+func (u *UserRepository) GetUserLikedDances(ctx context.Context, userID uuid.UUID) ([]models.DanceLike, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    
+    rows, err := u.db.Query(ctx, GetUserLikedDancesQuery, userID)
+    if err != nil {
+        logger.Error("failed to get liked dances: " + err.Error())
+        return nil, users.ErrorInternalServerError
+    }
+    defer rows.Close()
+
+    var likes []models.DanceLike
+    for rows.Next() {
+        var l models.DanceLike
+        if err := rows.Scan(&l.DanceID, &l.CreatedAt); err != nil {
+            logger.Error("failed to scan like: " + err.Error())
+            return nil, users.ErrorInternalServerError
+        }
+        likes = append(likes, l)
+    }
+    return likes, nil
+}
+
+func (u *UserRepository) CleanHistory(ctx context.Context, userID uuid.UUID) error {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    _, err := u.db.Exec(ctx, CleanHistoryQuery, userID)
+    if err != nil {
+        logger.Error("failed to clean history: " + err.Error())
+        return users.ErrorInternalServerError
+    }
+    return nil
+}

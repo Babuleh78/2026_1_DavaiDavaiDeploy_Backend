@@ -37,3 +37,9 @@ var GetTopLikedDancesQuery string
 
 //go:embed sql/deleteLikeQuery.sql
 var DeleteLikeQuery string
+
+//go:embed sql/getUserLikedDancesQuery.sql
+var GetUserLikedDancesQuery string
+
+//go:embed sql/cleanHistoryQuery.sql
+var CleanHistoryQuery string

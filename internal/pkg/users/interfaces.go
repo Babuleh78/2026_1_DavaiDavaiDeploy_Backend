@@ -26,6 +26,7 @@ type UsersUsecase interface {
 	ToggleLike(ctx context.Context, userID uuid.UUID, danceID string) (*models.LikeResponse, error)
 	GetTopLikedDances(ctx context.Context, limit int) ([]models.DanceLikeStat, error)
 	CompareDance(ctx context.Context, videoKey string, danceID string, segmentIdx int) (*models.DanceCompareResponse, error)
+	GetUserLikedDances(ctx context.Context, userID uuid.UUID) ([]models.DanceLike, error)
 }
 
 
@@ -41,6 +42,8 @@ type UsersRepo interface {
 	GetLikesCount(ctx context.Context, danceID string) (int64, error)
 	IsLikedByUser(ctx context.Context, userID uuid.UUID, danceID string) (bool, error)
 	GetTopLikedDances(ctx context.Context, limit int) ([]models.DanceLikeStat, error)
+	GetUserLikedDances(ctx context.Context, userID uuid.UUID) ([]models.DanceLike, error)
+	CleanHistory(ctx context.Context, userID uuid.UUID) error
 }
 
 type StorageRepo interface {

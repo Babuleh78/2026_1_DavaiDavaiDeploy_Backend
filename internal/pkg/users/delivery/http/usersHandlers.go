@@ -842,3 +842,40 @@ func (u *UserHandler) CompareDance(w http.ResponseWriter, r *http.Request) {
 	helpers.WriteJSON(w, result)
 	log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
+
+
+// GetUserLikedDances godoc
+// @Summary Get all liked dances for current user
+// @Tags users
+// @Produce json
+// @Success 200 {object} models.UserLikeDancesResponse
+// @Failure 401
+// @Failure 500
+// @Router /users/likes [get]
+func(u *UserHandler) GetUserLikedDances(w http.ResponseWriter, r *http.Request){
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+	userID, ok := r.Context().Value(users.UserKey).(models.User)
+	if !ok {
+		log.LogHandlerError(logger, errors.New("user unauthorized"), http.StatusUnauthorized)
+        helpers.WriteError(w, http.StatusUnauthorized)
+        return
+	}
+
+	likes, err := u.uc.GetUserLikedDances(r.Context(), userID.ID)
+	if err != nil {
+		helpers.WriteError(w, http.StatusInternalServerError)
+		return
+	}
+
+	response := models.UserLikeDancesResponse{
+		Likes: likes,
+		Count: len(likes),
+	}
+	if response.Likes == nil {
+		response.Likes = []models.DanceLike{}
+	}
+
+	helpers.WriteJSON(w, response)
+	log.LogHandlerInfo(logger, "success", http.StatusOK)
+}

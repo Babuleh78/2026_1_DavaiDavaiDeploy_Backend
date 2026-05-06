@@ -36,6 +36,13 @@ definitions:
           type: string
         type: array
     type: object
+  models.DanceLike:
+    properties:
+      created_at:
+        type: string
+      dance_id:
+        type: string
+    type: object
   models.LikeResponse:
     properties:
       dance_id:
@@ -189,6 +196,15 @@ definitions:
     - is_foreign
     - login
     - version
+    type: object
+  models.UserLikeDancesResponse:
+    properties:
+      count:
+        type: integer
+      likes:
+        items:
+          $ref: '#/definitions/models.DanceLike'
+        type: array
     type: object
   models.VKAuthRequest:
     properties:
@@ -633,6 +649,22 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Обновить название записи в истории
+      tags:
+      - users
+  /users/likes:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.UserLikeDancesResponse'
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Get all liked dances for current user
       tags:
       - users
   /users/load:

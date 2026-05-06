@@ -619,6 +619,31 @@ const docTemplate = `{
                 }
             }
         },
+        "/users/likes": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get all liked dances for current user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.UserLikeDancesResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/users/load": {
             "post": {
                 "security": [
@@ -868,6 +893,17 @@ const docTemplate = `{
                 }
             }
         },
+        "models.DanceLike": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "dance_id": {
+                    "type": "string"
+                }
+            }
+        },
         "models.LikeResponse": {
             "type": "object",
             "properties": {
@@ -1097,6 +1133,20 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
+                }
+            }
+        },
+        "models.UserLikeDancesResponse": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "likes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.DanceLike"
+                    }
                 }
             }
         },
