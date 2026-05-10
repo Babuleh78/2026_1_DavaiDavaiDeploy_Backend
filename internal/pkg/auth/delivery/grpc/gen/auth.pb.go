@@ -1317,6 +1317,158 @@ func (x *GetSegmentDescriptionResponse) GetDescription() string {
 	return ""
 }
 
+type CompareDanceRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Dance            []byte                 `protobuf:"bytes,1,opt,name=Dance,proto3" json:"Dance,omitempty"`
+	FileFormat       string                 `protobuf:"bytes,2,opt,name=FileFormat,proto3" json:"FileFormat,omitempty"`
+	ReferenceDanceID string                 `protobuf:"bytes,3,opt,name=ReferenceDanceID,proto3" json:"ReferenceDanceID,omitempty"`
+	UserID           string                 `protobuf:"bytes,4,opt,name=UserID,proto3" json:"UserID,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CompareDanceRequest) Reset() {
+	*x = CompareDanceRequest{}
+	mi := &file_auth_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompareDanceRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompareDanceRequest) ProtoMessage() {}
+
+func (x *CompareDanceRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompareDanceRequest.ProtoReflect.Descriptor instead.
+func (*CompareDanceRequest) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *CompareDanceRequest) GetDance() []byte {
+	if x != nil {
+		return x.Dance
+	}
+	return nil
+}
+
+func (x *CompareDanceRequest) GetFileFormat() string {
+	if x != nil {
+		return x.FileFormat
+	}
+	return ""
+}
+
+func (x *CompareDanceRequest) GetReferenceDanceID() string {
+	if x != nil {
+		return x.ReferenceDanceID
+	}
+	return ""
+}
+
+func (x *CompareDanceRequest) GetUserID() string {
+	if x != nil {
+		return x.UserID
+	}
+	return ""
+}
+
+type CompareDanceResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	UserGlbKey      string                 `protobuf:"bytes,1,opt,name=UserGlbKey,proto3" json:"UserGlbKey,omitempty"`
+	ReferenceGlbKey string                 `protobuf:"bytes,2,opt,name=ReferenceGlbKey,proto3" json:"ReferenceGlbKey,omitempty"`
+	Score           float64                `protobuf:"fixed64,3,opt,name=Score,proto3" json:"Score,omitempty"`
+	DtwDistance     float64                `protobuf:"fixed64,4,opt,name=DtwDistance,proto3" json:"DtwDistance,omitempty"`
+	UserDanceID     string                 `protobuf:"bytes,5,opt,name=UserDanceID,proto3" json:"UserDanceID,omitempty"`
+	DanceID         string                 `protobuf:"bytes,6,opt,name=DanceID,proto3" json:"DanceID,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CompareDanceResponse) Reset() {
+	*x = CompareDanceResponse{}
+	mi := &file_auth_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompareDanceResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompareDanceResponse) ProtoMessage() {}
+
+func (x *CompareDanceResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_auth_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompareDanceResponse.ProtoReflect.Descriptor instead.
+func (*CompareDanceResponse) Descriptor() ([]byte, []int) {
+	return file_auth_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *CompareDanceResponse) GetUserGlbKey() string {
+	if x != nil {
+		return x.UserGlbKey
+	}
+	return ""
+}
+
+func (x *CompareDanceResponse) GetReferenceGlbKey() string {
+	if x != nil {
+		return x.ReferenceGlbKey
+	}
+	return ""
+}
+
+func (x *CompareDanceResponse) GetScore() float64 {
+	if x != nil {
+		return x.Score
+	}
+	return 0
+}
+
+func (x *CompareDanceResponse) GetDtwDistance() float64 {
+	if x != nil {
+		return x.DtwDistance
+	}
+	return 0
+}
+
+func (x *CompareDanceResponse) GetUserDanceID() string {
+	if x != nil {
+		return x.UserDanceID
+	}
+	return ""
+}
+
+func (x *CompareDanceResponse) GetDanceID() string {
+	if x != nil {
+		return x.DanceID
+	}
+	return ""
+}
+
 var File_auth_proto protoreflect.FileDescriptor
 
 const file_auth_proto_rawDesc = "" +
@@ -1410,7 +1562,23 @@ const file_auth_proto_rawDesc = "" +
 	"\n" +
 	"SegmentIdx\x18\x02 \x01(\x05R\n" +
 	"SegmentIdx\x12 \n" +
-	"\vDescription\x18\x03 \x01(\tR\vDescription2\xfb\a\n" +
+	"\vDescription\x18\x03 \x01(\tR\vDescription\"\x8f\x01\n" +
+	"\x13CompareDanceRequest\x12\x14\n" +
+	"\x05Dance\x18\x01 \x01(\fR\x05Dance\x12\x1e\n" +
+	"\n" +
+	"FileFormat\x18\x02 \x01(\tR\n" +
+	"FileFormat\x12*\n" +
+	"\x10ReferenceDanceID\x18\x03 \x01(\tR\x10ReferenceDanceID\x12\x16\n" +
+	"\x06UserID\x18\x04 \x01(\tR\x06UserID\"\xd4\x01\n" +
+	"\x14CompareDanceResponse\x12\x1e\n" +
+	"\n" +
+	"UserGlbKey\x18\x01 \x01(\tR\n" +
+	"UserGlbKey\x12(\n" +
+	"\x0fReferenceGlbKey\x18\x02 \x01(\tR\x0fReferenceGlbKey\x12\x14\n" +
+	"\x05Score\x18\x03 \x01(\x01R\x05Score\x12 \n" +
+	"\vDtwDistance\x18\x04 \x01(\x01R\vDtwDistance\x12 \n" +
+	"\vUserDanceID\x18\x05 \x01(\tR\vUserDanceID\x12\x18\n" +
+	"\aDanceID\x18\x06 \x01(\tR\aDanceID2\xc4\b\n" +
 	"\x04Auth\x127\n" +
 	"\n" +
 	"SignupUser\x12\x13.auth.SignupRequest\x1a\x12.auth.AuthResponse\"\x00\x127\n" +
@@ -1424,7 +1592,8 @@ const file_auth_proto_rawDesc = "" +
 	"\x0eLoadDanceByURL\x12\x1b.auth.LoadDanceByURLRequest\x1a\x17.auth.LoadDanceResponse\"\x00\x12D\n" +
 	"\fGetDanceByID\x12\x19.auth.GetDanceByIDRequest\x1a\x17.auth.LoadDanceResponse\"\x00\x12D\n" +
 	"\vGetMainPage\x12\x18.auth.GetMainPageRequest\x1a\x19.auth.GetMainPageResponse\"\x00\x12b\n" +
-	"\x15GetSegmentDescription\x12\".auth.GetSegmentDescriptionRequest\x1a#.auth.GetSegmentDescriptionResponse\"\x00\x12K\n" +
+	"\x15GetSegmentDescription\x12\".auth.GetSegmentDescriptionRequest\x1a#.auth.GetSegmentDescriptionResponse\"\x00\x12G\n" +
+	"\fCompareDance\x12\x19.auth.CompareDanceRequest\x1a\x1a.auth.CompareDanceResponse\"\x00\x12K\n" +
 	"\x12ValidateAndGetUser\x12\x1f.auth.ValidateAndGetUserRequest\x1a\x12.auth.UserResponse\"\x00\x12>\n" +
 	"\tEnable2fa\x12\x16.auth.Enable2faRequest\x1a\x17.auth.Enable2faResponse\"\x00\x12A\n" +
 	"\n" +
@@ -1444,7 +1613,7 @@ func file_auth_proto_rawDescGZIP() []byte {
 	return file_auth_proto_rawDescData
 }
 
-var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
+var file_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 26)
 var file_auth_proto_goTypes = []any{
 	(*SignupVKRequest)(nil),               // 0: auth.SignupVKRequest
 	(*Enable2FaRequest)(nil),              // 1: auth.Enable2faRequest
@@ -1470,6 +1639,8 @@ var file_auth_proto_goTypes = []any{
 	(*GetMainPageResponse)(nil),           // 21: auth.GetMainPageResponse
 	(*GetSegmentDescriptionRequest)(nil),  // 22: auth.GetSegmentDescriptionRequest
 	(*GetSegmentDescriptionResponse)(nil), // 23: auth.GetSegmentDescriptionResponse
+	(*CompareDanceRequest)(nil),           // 24: auth.CompareDanceRequest
+	(*CompareDanceResponse)(nil),          // 25: auth.CompareDanceResponse
 }
 var file_auth_proto_depIdxs = []int32{
 	6,  // 0: auth.AuthResponse.User:type_name -> auth.UserResponse
@@ -1484,28 +1655,30 @@ var file_auth_proto_depIdxs = []int32{
 	18, // 9: auth.Auth.GetDanceByID:input_type -> auth.GetDanceByIDRequest
 	19, // 10: auth.Auth.GetMainPage:input_type -> auth.GetMainPageRequest
 	22, // 11: auth.Auth.GetSegmentDescription:input_type -> auth.GetSegmentDescriptionRequest
-	17, // 12: auth.Auth.ValidateAndGetUser:input_type -> auth.ValidateAndGetUserRequest
-	1,  // 13: auth.Auth.Enable2fa:input_type -> auth.Enable2faRequest
-	3,  // 14: auth.Auth.Disable2fa:input_type -> auth.Disable2faRequest
-	0,  // 15: auth.Auth.SignUpUserVK:input_type -> auth.SignupVKRequest
-	0,  // 16: auth.Auth.SignInUserVK:input_type -> auth.SignupVKRequest
-	9,  // 17: auth.Auth.SignupUser:output_type -> auth.AuthResponse
-	9,  // 18: auth.Auth.SignInUser:output_type -> auth.AuthResponse
-	16, // 19: auth.Auth.LogOutUser:output_type -> auth.LogOutUserResponse
-	6,  // 20: auth.Auth.GetUser:output_type -> auth.UserResponse
-	9,  // 21: auth.Auth.ChangePassword:output_type -> auth.AuthResponse
-	14, // 22: auth.Auth.LoadDance:output_type -> auth.LoadDanceResponse
-	14, // 23: auth.Auth.LoadDanceByURL:output_type -> auth.LoadDanceResponse
-	14, // 24: auth.Auth.GetDanceByID:output_type -> auth.LoadDanceResponse
-	21, // 25: auth.Auth.GetMainPage:output_type -> auth.GetMainPageResponse
-	23, // 26: auth.Auth.GetSegmentDescription:output_type -> auth.GetSegmentDescriptionResponse
-	6,  // 27: auth.Auth.ValidateAndGetUser:output_type -> auth.UserResponse
-	2,  // 28: auth.Auth.Enable2fa:output_type -> auth.Enable2faResponse
-	4,  // 29: auth.Auth.Disable2fa:output_type -> auth.Disable2faResponse
-	9,  // 30: auth.Auth.SignUpUserVK:output_type -> auth.AuthResponse
-	9,  // 31: auth.Auth.SignInUserVK:output_type -> auth.AuthResponse
-	17, // [17:32] is the sub-list for method output_type
-	2,  // [2:17] is the sub-list for method input_type
+	24, // 12: auth.Auth.CompareDance:input_type -> auth.CompareDanceRequest
+	17, // 13: auth.Auth.ValidateAndGetUser:input_type -> auth.ValidateAndGetUserRequest
+	1,  // 14: auth.Auth.Enable2fa:input_type -> auth.Enable2faRequest
+	3,  // 15: auth.Auth.Disable2fa:input_type -> auth.Disable2faRequest
+	0,  // 16: auth.Auth.SignUpUserVK:input_type -> auth.SignupVKRequest
+	0,  // 17: auth.Auth.SignInUserVK:input_type -> auth.SignupVKRequest
+	9,  // 18: auth.Auth.SignupUser:output_type -> auth.AuthResponse
+	9,  // 19: auth.Auth.SignInUser:output_type -> auth.AuthResponse
+	16, // 20: auth.Auth.LogOutUser:output_type -> auth.LogOutUserResponse
+	6,  // 21: auth.Auth.GetUser:output_type -> auth.UserResponse
+	9,  // 22: auth.Auth.ChangePassword:output_type -> auth.AuthResponse
+	14, // 23: auth.Auth.LoadDance:output_type -> auth.LoadDanceResponse
+	14, // 24: auth.Auth.LoadDanceByURL:output_type -> auth.LoadDanceResponse
+	14, // 25: auth.Auth.GetDanceByID:output_type -> auth.LoadDanceResponse
+	21, // 26: auth.Auth.GetMainPage:output_type -> auth.GetMainPageResponse
+	23, // 27: auth.Auth.GetSegmentDescription:output_type -> auth.GetSegmentDescriptionResponse
+	25, // 28: auth.Auth.CompareDance:output_type -> auth.CompareDanceResponse
+	6,  // 29: auth.Auth.ValidateAndGetUser:output_type -> auth.UserResponse
+	2,  // 30: auth.Auth.Enable2fa:output_type -> auth.Enable2faResponse
+	4,  // 31: auth.Auth.Disable2fa:output_type -> auth.Disable2faResponse
+	9,  // 32: auth.Auth.SignUpUserVK:output_type -> auth.AuthResponse
+	9,  // 33: auth.Auth.SignInUserVK:output_type -> auth.AuthResponse
+	18, // [18:34] is the sub-list for method output_type
+	2,  // [2:18] is the sub-list for method input_type
 	2,  // [2:2] is the sub-list for extension type_name
 	2,  // [2:2] is the sub-list for extension extendee
 	0,  // [0:2] is the sub-list for field type_name
@@ -1524,7 +1697,7 @@ func file_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_auth_proto_rawDesc), len(file_auth_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   24,
+			NumMessages:   26,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

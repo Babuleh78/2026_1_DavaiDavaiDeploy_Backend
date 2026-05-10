@@ -168,11 +168,14 @@ func main() {
 	userRouter := apiRouter.PathPrefix("/users").Subrouter()
 	userRouter.Handle("/load", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDance))).Methods(http.MethodPost, http.MethodOptions)
 	userRouter.Handle("/loadByURL", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.LoadDanceByURL))).Methods(http.MethodPost, http.MethodOptions)
-
-	userRouter.HandleFunc("/dance/compare", userHandler.CompareDance).Methods(http.MethodPost, http.MethodOptions)
-	userRouter.Handle("/dance/{id}", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.GetDanceByID))).Methods(http.MethodGet, http.MethodOptions)
+	userRouter.Handle("/load/trim", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.TrimAndLoadDance))).Methods(http.MethodPost, http.MethodOptions)
+	userRouter.Handle("/dance/compare-upload", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.CompareDanceWithFile))).Methods(http.MethodPost, http.MethodOptions)
+	userRouter.Handle("/dance/rate", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.GetRating))).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/main_page", userHandler.GetMainPage).Methods(http.MethodGet, http.MethodOptions)
+
+	userRouter.Handle("/dance/{id}", userHandler.OptionalAuthMiddleware(http.HandlerFunc(userHandler.GetDanceByID))).Methods(http.MethodGet, http.MethodOptions)
 	userRouter.HandleFunc("/dance/{dance_id}/segment/{segment_idx}", userHandler.GetSegmentDescription).Methods(http.MethodGet)
+	
 
 	protectedUserRouter := userRouter.PathPrefix("").Subrouter()
 	protectedUserRouter.Use(userHandler.Middleware)
@@ -182,6 +185,8 @@ func main() {
 	protectedUserRouter.HandleFunc("/history/{history_id}", userHandler.UpdateHistoryName).Methods(http.MethodPut, http.MethodOptions)
 	protectedUserRouter.HandleFunc("/dance/{id}/like", userHandler.ToggleLike).Methods(http.MethodPost, http.MethodOptions)
 	protectedUserRouter.HandleFunc("/likes", userHandler.GetUserLikedDances).Methods(http.MethodGet, http.MethodOptions)
+	protectedUserRouter.HandleFunc("/dance/rate", userHandler.SaveRating).Methods(http.MethodPost, http.MethodOptions)
+	
 
 	danceSrv := http.Server{
 		Handler: mainRouter,

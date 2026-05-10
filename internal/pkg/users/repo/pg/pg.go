@@ -242,3 +242,28 @@ func (u *UserRepository) CleanHistory(ctx context.Context, userID uuid.UUID) err
     }
     return nil
 }
+
+func (u *UserRepository) SaveRating(ctx context.Context, userID uuid.UUID, input models.SaveRatingInput) error {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    _, err := u.db.Exec(ctx, SaveRatingQuery,
+        input.VideoID, userID, input.Physical, input.Speed, input.Coordination, input.Repeatability)
+    if err != nil {
+        logger.Error("failed to save rating: " + err.Error())
+        return users.ErrorInternalServerError
+    }
+    return nil
+}
+
+func (u *UserRepository) GetAggregatedRating(ctx context.Context, videoID string) (*models.RatingResponse, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    row := u.db.QueryRow(ctx, GetAggregatedRatingQuery, videoID)
+
+    var r models.RatingResponse
+    r.VideoID = videoID
+    if err := row.Scan(&r.AvgPhysical, &r.AvgSpeed, &r.AvgCoordination, &r.AvgRepeatability, &r.AvgScore, &r.TotalRatings); err != nil {
+        logger.Error("failed to get rating: " + err.Error())
+        return nil, users.ErrorInternalServerError
+    }
+    return &r, nil
+}
+

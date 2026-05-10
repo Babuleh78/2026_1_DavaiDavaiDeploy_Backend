@@ -26,7 +26,11 @@ type UsersUsecase interface {
 	ToggleLike(ctx context.Context, userID uuid.UUID, danceID string) (*models.LikeResponse, error)
 	GetTopLikedDances(ctx context.Context, limit int) ([]models.DanceLikeStat, error)
 	CompareDance(ctx context.Context, videoKey string, danceID string, segmentIdx int) (*models.DanceCompareResponse, error)
+	CompareDanceFromBuffer(ctx context.Context, buffer []byte, fileFormat string, referenceDanceID string, userID uuid.UUID) (*models.CompareResult, error)
 	GetUserLikedDances(ctx context.Context, userID uuid.UUID) ([]models.DanceLike, error)
+	SaveRating(ctx context.Context, userID uuid.UUID, input models.SaveRatingInput) (*models.RatingResponse, error)
+	GetAggregatedRating(ctx context.Context, videoID string) (*models.RatingResponse, error)
+	GetRating(ctx context.Context, videoID string) (*models.RatingResponse, error)
 }
 
 
@@ -44,10 +48,15 @@ type UsersRepo interface {
 	GetTopLikedDances(ctx context.Context, limit int) ([]models.DanceLikeStat, error)
 	GetUserLikedDances(ctx context.Context, userID uuid.UUID) ([]models.DanceLike, error)
 	CleanHistory(ctx context.Context, userID uuid.UUID) error
+	SaveRating(ctx context.Context, userID uuid.UUID, input models.SaveRatingInput) error
+	GetAggregatedRating(ctx context.Context, videoID string) (*models.RatingResponse, error)
+	
 }
 
 type StorageRepo interface {
 	UploadDance(ctx context.Context, buffer []byte, fileFormat string, danceExtension string) (string, error)
 	ListDances(ctx context.Context, maxKeys int) ([]string, error)
 	DownloadFile(ctx context.Context, s3Key string) ([]byte, error)
+	UploadFileRaw(ctx context.Context, localPath string, s3Key string) error
+    DeleteFile(ctx context.Context, s3Key string) error
 }

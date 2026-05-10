@@ -10,6 +10,21 @@ definitions:
     - new_password
     - old_password
     type: object
+  models.CompareResult:
+    properties:
+      dance_id:
+        type: string
+      dtw_distance:
+        type: number
+      reference_glb_key:
+        type: string
+      score:
+        type: number
+      user_dance_id:
+        type: string
+      user_glb_key:
+        type: string
+    type: object
   models.DanceCompareRequest:
     properties:
       dance_id:
@@ -92,6 +107,36 @@ definitions:
         items:
           $ref: '#/definitions/models.VideoItem'
         type: array
+    type: object
+  models.RatingResponse:
+    properties:
+      avg_coordination:
+        type: number
+      avg_physical:
+        type: number
+      avg_repeatability:
+        type: number
+      avg_score:
+        type: number
+      avg_speed:
+        type: number
+      total_ratings:
+        type: integer
+      video_id:
+        type: string
+    type: object
+  models.SaveRatingInput:
+    properties:
+      coordination:
+        type: integer
+      physical:
+        type: integer
+      repeatability:
+        type: integer
+      speed:
+        type: integer
+      video_id:
+        type: string
     type: object
   models.SearchHistoryItem:
     properties:
@@ -552,6 +597,83 @@ paths:
       summary: Сравнить танец пользователя с оригиналом
       tags:
       - dances
+  /users/dance/compare-upload:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: User dance video
+        in: formData
+        name: dance
+        required: true
+        type: file
+      - description: Reference dance ID
+        in: formData
+        name: reference_dance_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.CompareResult'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Compare user dance with reference
+      tags:
+      - users
+  /users/dance/rate:
+    get:
+      parameters:
+      - description: Dance ID
+        in: query
+        name: dance_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.RatingResponse'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Get aggregated dance rating
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Rating data
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/models.SaveRatingInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.RatingResponse'
+        "400":
+          description: Bad Request
+        "401":
+          description: Unauthorized
+        "500":
+          description: Internal Server Error
+      summary: Save dance rating
+      tags:
+      - users
   /users/history:
     get:
       description: Возвращает список ранее загруженных или просмотренных танцев текущего
@@ -703,6 +825,40 @@ paths:
       summary: Загрузить видео танца и обработать его
       tags:
       - dances
+  /users/load/trim:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Dance video file
+        in: formData
+        name: dance
+        required: true
+        type: file
+      - description: Start time in seconds
+        in: formData
+        name: start_sec
+        required: true
+        type: number
+      - description: End time in seconds
+        in: formData
+        name: end_sec
+        required: true
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LoadDanceResponse'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Trim video and load dance
+      tags:
+      - users
   /users/loadByURL:
     post:
       consumes:

@@ -29,6 +29,7 @@ const (
 	Auth_GetDanceByID_FullMethodName          = "/auth.Auth/GetDanceByID"
 	Auth_GetMainPage_FullMethodName           = "/auth.Auth/GetMainPage"
 	Auth_GetSegmentDescription_FullMethodName = "/auth.Auth/GetSegmentDescription"
+	Auth_CompareDance_FullMethodName          = "/auth.Auth/CompareDance"
 	Auth_ValidateAndGetUser_FullMethodName    = "/auth.Auth/ValidateAndGetUser"
 	Auth_Enable2Fa_FullMethodName             = "/auth.Auth/Enable2fa"
 	Auth_Disable2Fa_FullMethodName            = "/auth.Auth/Disable2fa"
@@ -50,6 +51,7 @@ type AuthClient interface {
 	GetDanceByID(ctx context.Context, in *GetDanceByIDRequest, opts ...grpc.CallOption) (*LoadDanceResponse, error)
 	GetMainPage(ctx context.Context, in *GetMainPageRequest, opts ...grpc.CallOption) (*GetMainPageResponse, error)
 	GetSegmentDescription(ctx context.Context, in *GetSegmentDescriptionRequest, opts ...grpc.CallOption) (*GetSegmentDescriptionResponse, error)
+	CompareDance(ctx context.Context, in *CompareDanceRequest, opts ...grpc.CallOption) (*CompareDanceResponse, error)
 	ValidateAndGetUser(ctx context.Context, in *ValidateAndGetUserRequest, opts ...grpc.CallOption) (*UserResponse, error)
 	Enable2Fa(ctx context.Context, in *Enable2FaRequest, opts ...grpc.CallOption) (*Enable2FaResponse, error)
 	Disable2Fa(ctx context.Context, in *Disable2FaRequest, opts ...grpc.CallOption) (*Disable2FaResponse, error)
@@ -165,6 +167,16 @@ func (c *authClient) GetSegmentDescription(ctx context.Context, in *GetSegmentDe
 	return out, nil
 }
 
+func (c *authClient) CompareDance(ctx context.Context, in *CompareDanceRequest, opts ...grpc.CallOption) (*CompareDanceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompareDanceResponse)
+	err := c.cc.Invoke(ctx, Auth_CompareDance_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *authClient) ValidateAndGetUser(ctx context.Context, in *ValidateAndGetUserRequest, opts ...grpc.CallOption) (*UserResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UserResponse)
@@ -229,6 +241,7 @@ type AuthServer interface {
 	GetDanceByID(context.Context, *GetDanceByIDRequest) (*LoadDanceResponse, error)
 	GetMainPage(context.Context, *GetMainPageRequest) (*GetMainPageResponse, error)
 	GetSegmentDescription(context.Context, *GetSegmentDescriptionRequest) (*GetSegmentDescriptionResponse, error)
+	CompareDance(context.Context, *CompareDanceRequest) (*CompareDanceResponse, error)
 	ValidateAndGetUser(context.Context, *ValidateAndGetUserRequest) (*UserResponse, error)
 	Enable2Fa(context.Context, *Enable2FaRequest) (*Enable2FaResponse, error)
 	Disable2Fa(context.Context, *Disable2FaRequest) (*Disable2FaResponse, error)
@@ -273,6 +286,9 @@ func (UnimplementedAuthServer) GetMainPage(context.Context, *GetMainPageRequest)
 }
 func (UnimplementedAuthServer) GetSegmentDescription(context.Context, *GetSegmentDescriptionRequest) (*GetSegmentDescriptionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetSegmentDescription not implemented")
+}
+func (UnimplementedAuthServer) CompareDance(context.Context, *CompareDanceRequest) (*CompareDanceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompareDance not implemented")
 }
 func (UnimplementedAuthServer) ValidateAndGetUser(context.Context, *ValidateAndGetUserRequest) (*UserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateAndGetUser not implemented")
@@ -490,6 +506,24 @@ func _Auth_GetSegmentDescription_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Auth_CompareDance_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompareDanceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServer).CompareDance(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Auth_CompareDance_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServer).CompareDance(ctx, req.(*CompareDanceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Auth_ValidateAndGetUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ValidateAndGetUserRequest)
 	if err := dec(in); err != nil {
@@ -626,6 +660,10 @@ var Auth_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetSegmentDescription",
 			Handler:    _Auth_GetSegmentDescription_Handler,
+		},
+		{
+			MethodName: "CompareDance",
+			Handler:    _Auth_CompareDance_Handler,
 		},
 		{
 			MethodName: "ValidateAndGetUser",

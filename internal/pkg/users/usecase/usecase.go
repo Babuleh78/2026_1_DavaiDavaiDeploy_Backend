@@ -14,6 +14,7 @@ import (
 	"os"
 	"time"
 	"strings"
+    "io"
 	
 
 	jwt "github.com/golang-jwt/jwt/v5"
@@ -76,13 +77,13 @@ func (uc *UserUsecase) ParseToken(token string) (*jwt.Token, error) {
 func (uc *UserUsecase) AddToHistory(ctx context.Context, userID uuid.UUID, danceID string, sourceURL string) error {
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
     
-    err := uc.pgRepo.AddToHistory(ctx, userID, danceID, sourceURL)
+    err := uc.userRepo.AddToHistory(ctx, userID, danceID, sourceURL)
     if err != nil {
         logger.Error("failed to add to history", "error", err)
         return err
     }
 
-    if err := uc.pgRepo.CleanHistory(ctx, userID); err != nil {
+    if err := uc.userRepo.CleanHistory(ctx, userID); err != nil {
         logger.Error("failed to clean history", "error", err)
     }
 
@@ -596,7 +597,7 @@ func (uc *UserUsecase) GetTopLikedDances(ctx context.Context, limit int) ([]mode
 
 func (uc *UserUsecase) CompareDance(ctx context.Context, videoKey string, danceID string, segmentIdx int) (*models.DanceCompareResponse, error) {
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
-
+    logger.Info("CompareDance called", "videoKey", videoKey, "danceID", danceID)
     if videoKey == "" || danceID == "" {
         logger.Error("videoKey or danceID is empty")
         return nil, users.ErrorBadRequest
@@ -620,9 +621,10 @@ func (uc *UserUsecase) CompareDance(ctx context.Context, videoKey string, danceI
 func (uc *UserUsecase) enqueueCompare(ctx context.Context, videoKey, danceID string, segmentIdx int) (string, error) {
     compareURL := os.Getenv("ML_SERVICE_URL") + "/dance_compare"
     requestBody := map[string]interface{}{
-        "video_key":   videoKey,
-        "dance_id":    danceID,
-        "segment_idx": segmentIdx,
+        "original_video_s3_path": fmt.Sprintf("results/%s/video.mp4", danceID),
+        "user_video_s3_path":     videoKey,
+        "user_id":                "anonymous",
+        "dance_id":               danceID,
     }
 
     jsonBody, _ := json.Marshal(requestBody)
@@ -630,14 +632,25 @@ func (uc *UserUsecase) enqueueCompare(ctx context.Context, videoKey, danceID str
 
     resp, err := client.Post(compareURL, "application/json", bytes.NewBuffer(jsonBody))
     if err != nil {
-        return "", err
+        return "", fmt.Errorf("failed to POST to ML service: %w", err)
     }
     defer resp.Body.Close()
+
+    if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
+        body, _ := io.ReadAll(resp.Body)
+        return "", fmt.Errorf("ML service returned %d: %s", resp.StatusCode, string(body))
+    }
 
     var response struct {
         TaskID string `json:"task_id"`
     }
-    json.NewDecoder(resp.Body).Decode(&response)
+    if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+        return "", fmt.Errorf("failed to decode ML response: %w", err)
+    }
+    if response.TaskID == "" {
+        return "", fmt.Errorf("ML service returned empty task_id")
+    }
+
     return response.TaskID, nil
 }
 
@@ -683,4 +696,159 @@ func (uc *UserUsecase) GetUserLikedDances(ctx context.Context, userID uuid.UUID)
         return nil, users.ErrorInternalServerError
     }
     return likes, nil
+}
+
+func (uc *UserUsecase) SaveRating(ctx context.Context, userID uuid.UUID, input models.SaveRatingInput) (*models.RatingResponse, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    
+    if err := input.Validate(); err != nil {
+        logger.Error("invalid rating input", "error", err)
+        return nil, users.ErrorBadRequest
+    }
+    
+    err := uc.userRepo.SaveRating(ctx, userID, input)
+    if err != nil {
+        logger.Error("failed to save rating", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+    
+    return uc.GetAggregatedRating(ctx, input.VideoID)
+}
+
+func (uc *UserUsecase) GetAggregatedRating(ctx context.Context, videoID string) (*models.RatingResponse, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    
+    if videoID == "" {
+        logger.Error("empty videoID")
+        return nil, users.ErrorBadRequest
+    }
+    
+    rating, err := uc.userRepo.GetAggregatedRating(ctx, videoID)
+    if err != nil {
+        logger.Error("failed to get aggregated rating", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+    
+    return rating, nil
+}
+
+
+func (uc *UserUsecase) CompareDanceFromBuffer(ctx context.Context, buffer []byte, fileFormat string, referenceDanceID string, userID uuid.UUID) (*models.CompareResult, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+
+    userDanceID := uuid.NewV4().String()
+    videoKey := fmt.Sprintf("users/%s/%s/video.mp4", userID.String(), userDanceID)
+
+    tmpFile, err := os.CreateTemp("", "compare-input-*.mp4")
+    if err != nil {
+        return nil, users.ErrorInternalServerError
+    }
+    defer os.Remove(tmpFile.Name())
+
+    if _, err := tmpFile.Write(buffer); err != nil {
+        return nil, users.ErrorInternalServerError
+    }
+    tmpFile.Close()
+
+    if err := uc.storageRepo.UploadFileRaw(ctx, tmpFile.Name(), videoKey); err != nil {
+        logger.Error("failed to upload user video", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+
+    mlURL := os.Getenv("ML_SERVICE_URL") + "/dance_compare"
+    requestBody := map[string]string{
+        "original_video_s3_path": fmt.Sprintf("results/%s/video.mp4", referenceDanceID),
+        "user_video_s3_path":     videoKey,
+        "user_id":                userID.String(),
+        "dance_id":               referenceDanceID,
+    }
+
+    jsonBody, _ := json.Marshal(requestBody)
+    client := &http.Client{Timeout: 20 * time.Second}
+
+    resp, err := client.Post(mlURL, "application/json", bytes.NewBuffer(jsonBody))
+    if err != nil {
+        logger.Error("failed to call ml compare", "error", err)
+        uc.storageRepo.DeleteFile(ctx, videoKey)
+        return nil, users.ErrorInternalServerError
+    }
+    defer resp.Body.Close()
+
+    var taskResp struct {
+        TaskID string `json:"task_id"`
+        DanceID string `json:"dance_id"`
+        UserID  string `json:"user_id"`
+        Status  string `json:"status"`
+    }
+    if err := json.NewDecoder(resp.Body).Decode(&taskResp); err != nil {
+        uc.storageRepo.DeleteFile(ctx, videoKey)
+        return nil, users.ErrorInternalServerError
+    }
+
+    result, err := uc.waitForCompareResult(ctx, taskResp.TaskID, logger)
+
+    if deleteErr := uc.storageRepo.DeleteFile(ctx, videoKey); deleteErr != nil {
+        logger.Error("failed to delete user video", "error", deleteErr)
+    }
+
+    if err != nil {
+        return nil, err
+    }
+
+    return &models.CompareResult{
+        UserGlbKey:      result.UserGlbS3,
+        ReferenceGlbKey: result.OriginalVideoS3,
+        Score:           result.ComparisonScore,
+        DtwDistance:     result.DtwDistance,
+        DanceID:         referenceDanceID,
+        UserDanceID:     userDanceID,
+    }, nil
+}
+
+func (uc *UserUsecase) waitForCompareResult(ctx context.Context, taskID string, logger *slog.Logger) (*models.CompareStatusResult, error) {
+    statusURL := os.Getenv("ML_SERVICE_URL") + "/status/" + taskID
+    deadline := time.Now().Add(10 * time.Minute)
+    client := &http.Client{Timeout: 10 * time.Second}
+
+    for time.Now().Before(deadline) {
+        time.Sleep(5 * time.Second)
+
+        resp, err := client.Get(statusURL)
+        if err != nil {
+            logger.Warn("status check failed", "error", err)
+            continue
+        }
+
+        var statusResp struct {
+            Status string                    `json:"status"`
+            Result *models.CompareStatusResult `json:"result,omitempty"`
+        }
+        json.NewDecoder(resp.Body).Decode(&statusResp)
+        resp.Body.Close()
+
+        switch statusResp.Status {
+        case "done":
+            if statusResp.Result == nil {
+                return nil, users.ErrorInternalServerError
+            }
+            return statusResp.Result, nil
+        case "failed":
+            return nil, fmt.Errorf("comparison failed")
+        }
+    }
+
+    return nil, fmt.Errorf("comparison timeout")
+}
+
+func (uc *UserUsecase) GetRating(ctx context.Context, videoID string) (*models.RatingResponse, error) {
+    logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+    if videoID == "" {
+        return nil, users.ErrorBadRequest
+    }
+    rating, err := uc.userRepo.GetAggregatedRating(ctx, videoID)
+    if err != nil {
+        logger.Error("failed to get rating", "error", err)
+        return nil, users.ErrorInternalServerError
+    }
+    return rating, nil
 }

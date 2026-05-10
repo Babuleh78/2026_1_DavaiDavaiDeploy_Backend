@@ -129,7 +129,11 @@ func main() {
 	authHandler := authHandler.NewGrpcAuthHandler(authUsecase, userUsecase)
 
 	ddLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	gRPCServer := grpc.NewServer(grpc.ChainUnaryInterceptor(logger.LoggerInterceptor(ddLogger)))
+	gRPCServer := grpc.NewServer(
+		grpc.ChainUnaryInterceptor(logger.LoggerInterceptor(ddLogger)),
+		grpc.MaxRecvMsgSize(64*1024*1024),
+		grpc.MaxSendMsgSize(64*1024*1024),
+	)
 	gen.RegisterAuthServer(gRPCServer, authHandler)
 
 	r := mux.NewRouter().PathPrefix("").Subrouter()

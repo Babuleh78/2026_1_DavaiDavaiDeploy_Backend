@@ -43,3 +43,9 @@ var GetUserLikedDancesQuery string
 
 //go:embed sql/cleanHistoryQuery.sql
 var CleanHistoryQuery string
+
+//go:embed sql/saveRatingQuery.sql
+var SaveRatingQuery string
+
+//go:embed sql/getAggregatedRatingQuery.sql
+var GetAggregatedRatingQuery string

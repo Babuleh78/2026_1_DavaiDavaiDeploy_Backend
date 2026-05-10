@@ -311,6 +311,124 @@ const docTemplate = `{
                 }
             }
         },
+        "/users/dance/compare-upload": {
+            "post": {
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Compare user dance with reference",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "User dance video",
+                        "name": "dance",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Reference dance ID",
+                        "name": "reference_dance_id",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.CompareResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
+        "/users/dance/rate": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get aggregated dance rating",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Dance ID",
+                        "name": "dance_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.RatingResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            },
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Save dance rating",
+                "parameters": [
+                    {
+                        "description": "Rating data",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.SaveRatingInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.RatingResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "401": {
+                        "description": "Unauthorized"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/users/dance/{dance_id}/segment/{segment_idx}": {
             "get": {
                 "security": [
@@ -699,6 +817,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/users/load/trim": {
+            "post": {
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Trim video and load dance",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "Dance video file",
+                        "name": "dance",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "number",
+                        "description": "Start time in seconds",
+                        "name": "start_sec",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "number",
+                        "description": "End time in seconds",
+                        "name": "end_sec",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.LoadDanceResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request"
+                    },
+                    "500": {
+                        "description": "Internal Server Error"
+                    }
+                }
+            }
+        },
         "/users/loadByURL": {
             "post": {
                 "security": [
@@ -853,6 +1022,29 @@ const docTemplate = `{
                 }
             }
         },
+        "models.CompareResult": {
+            "type": "object",
+            "properties": {
+                "dance_id": {
+                    "type": "string"
+                },
+                "dtw_distance": {
+                    "type": "number"
+                },
+                "reference_glb_key": {
+                    "type": "string"
+                },
+                "score": {
+                    "type": "number"
+                },
+                "user_dance_id": {
+                    "type": "string"
+                },
+                "user_glb_key": {
+                    "type": "string"
+                }
+            }
+        },
         "models.DanceCompareRequest": {
             "type": "object",
             "properties": {
@@ -978,6 +1170,52 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/models.VideoItem"
                     }
+                }
+            }
+        },
+        "models.RatingResponse": {
+            "type": "object",
+            "properties": {
+                "avg_coordination": {
+                    "type": "number"
+                },
+                "avg_physical": {
+                    "type": "number"
+                },
+                "avg_repeatability": {
+                    "type": "number"
+                },
+                "avg_score": {
+                    "type": "number"
+                },
+                "avg_speed": {
+                    "type": "number"
+                },
+                "total_ratings": {
+                    "type": "integer"
+                },
+                "video_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.SaveRatingInput": {
+            "type": "object",
+            "properties": {
+                "coordination": {
+                    "type": "integer"
+                },
+                "physical": {
+                    "type": "integer"
+                },
+                "repeatability": {
+                    "type": "integer"
+                },
+                "speed": {
+                    "type": "integer"
+                },
+                "video_id": {
+                    "type": "string"
                 }
             }
         },

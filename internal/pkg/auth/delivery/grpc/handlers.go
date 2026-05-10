@@ -265,3 +265,27 @@ func (g GrpcAuthHandler) ChangePassword(ctx context.Context, in *gen.ChangePassw
 		CSRFToken: csrfToken,
 	}, err
 }
+
+func (g GrpcAuthHandler) CompareDance(ctx context.Context, in *gen.CompareDanceRequest) (*gen.CompareDanceResponse, error) {
+    userID := uuid.FromStringOrNil(in.UserID)
+	
+
+    result, err := g.uuc.CompareDanceFromBuffer(ctx, in.Dance, in.FileFormat, in.ReferenceDanceID, userID)
+    if err != nil {
+        switch err {
+        case users.ErrorNotFound:
+            return nil, status.Errorf(codes.NotFound, "%v", err)
+        default:
+            return nil, status.Errorf(codes.Internal, "%v", err)
+        }
+    }
+
+    return &gen.CompareDanceResponse{
+        UserGlbKey:      result.UserGlbKey,
+        ReferenceGlbKey: result.ReferenceGlbKey,
+        Score:           result.Score,
+        DtwDistance:     result.DtwDistance,
+        UserDanceID:     result.UserDanceID,
+        DanceID:         result.DanceID,
+    }, nil
+}

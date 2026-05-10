@@ -6,10 +6,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"strings"
-	"io"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -103,4 +104,29 @@ func (r *S3Repository) DownloadFile(ctx context.Context, s3Key string) ([]byte, 
         return nil, fmt.Errorf("failed to read object body: %w", err)
     }
     return data, nil
+}
+
+func (r *S3Repository) UploadFileRaw(ctx context.Context, localPath string, s3Key string) error {
+    f, err := os.Open(localPath)
+    if err != nil {
+        return fmt.Errorf("failed to open file: %w", err)
+    }
+    defer f.Close()
+
+    _, err = r.client.PutObject(ctx, &s3.PutObjectInput{
+        Bucket:      aws.String(r.bucket),
+        Key:         aws.String(s3Key),
+        Body:        f,
+        ContentType: aws.String("video/mp4"),
+        ACL:         types.ObjectCannedACLPublicRead,
+    })
+    return err
+}
+
+func (r *S3Repository) DeleteFile(ctx context.Context, s3Key string) error {
+    _, err := r.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+        Bucket: aws.String(r.bucket),
+        Key:    aws.String(s3Key),
+    })
+    return err
 }
