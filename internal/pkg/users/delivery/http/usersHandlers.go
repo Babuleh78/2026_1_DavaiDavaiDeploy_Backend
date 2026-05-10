@@ -868,9 +868,8 @@ func(u *UserHandler) GetUserLikedDances(w http.ResponseWriter, r *http.Request){
 		return
 	}
 
-	response := models.UserLikeDancesResponse{
+	response := models.UserLikedDancesResponse{
 		Likes: likes,
-		Count: len(likes),
 	}
 	if response.Likes == nil {
 		response.Likes = []models.DanceLike{}

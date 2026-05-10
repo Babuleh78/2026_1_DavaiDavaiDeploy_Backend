@@ -14,11 +14,12 @@ type DanceLikeStat struct {
 }
 
 type DanceLike struct {
-    DanceID string       `json:"dance_id"`
-    CreatedAt time.Time  `json:"created_at"`
+    HistoryID string    `json:"history_id"`
+    DanceID   string    `json:"dance_id"`
+    Name      string    `json:"name"`
+    CreatedAt time.Time `json:"created_at"`
 }
 
-type UserLikeDancesResponse struct {
+type UserLikedDancesResponse struct {
     Likes []DanceLike `json:"likes"`
-    Count int         `json:"count"`
 }

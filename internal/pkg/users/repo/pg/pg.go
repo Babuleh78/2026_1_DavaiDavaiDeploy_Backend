@@ -213,7 +213,6 @@ func (u *UserRepository) GetTopLikedDances(ctx context.Context, limit int) ([]mo
 
 func (u *UserRepository) GetUserLikedDances(ctx context.Context, userID uuid.UUID) ([]models.DanceLike, error) {
     logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
-    
     rows, err := u.db.Query(ctx, GetUserLikedDancesQuery, userID)
     if err != nil {
         logger.Error("failed to get liked dances: " + err.Error())
@@ -224,9 +223,13 @@ func (u *UserRepository) GetUserLikedDances(ctx context.Context, userID uuid.UUI
     var likes []models.DanceLike
     for rows.Next() {
         var l models.DanceLike
-        if err := rows.Scan(&l.DanceID, &l.CreatedAt); err != nil {
+        var historyID *string
+        if err := rows.Scan(&historyID, &l.DanceID, &l.Name, &l.CreatedAt); err != nil {
             logger.Error("failed to scan like: " + err.Error())
             return nil, users.ErrorInternalServerError
+        }
+        if historyID != nil {
+            l.HistoryID = *historyID
         }
         likes = append(likes, l)
     }
