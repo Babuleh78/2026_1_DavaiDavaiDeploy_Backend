@@ -64,7 +64,8 @@ func (r *AuthRepository) CheckUserLogin(ctx context.Context, login string) (mode
 		&user.PasswordHash,
 		&user.Avatar,
 		&user.CreatedAt,
-		&user.UpdatedAt)
+		&user.UpdatedAt,
+		&user.IsForeign)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.Error("user not exists")

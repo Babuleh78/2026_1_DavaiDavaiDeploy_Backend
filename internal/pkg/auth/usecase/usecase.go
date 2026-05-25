@@ -4,9 +4,9 @@ import (
 	"DDDance/internal/models"
 	"DDDance/internal/pkg/auth"
 	"DDDance/internal/pkg/utils/log"
-	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base32"
 	"fmt"
 	"log/slog"
@@ -22,14 +22,13 @@ import (
 	"golang.org/x/crypto/argon2"
 )
 
-func HashPass(plainPassword string) []byte {
+func HashPass(plainPassword string) ([]byte, error) {
 	salt := make([]byte, 8)
-	_, err := rand.Read(salt)
-	if err != nil {
-		return []byte{}
+	if _, err := rand.Read(salt); err != nil {
+		return nil, err
 	}
 	hashedPass := argon2.IDKey([]byte(plainPassword), []byte(salt), 1, 64*1024, 4, 32)
-	return append(salt, hashedPass...)
+	return append(salt, hashedPass...), nil
 }
 
 func CheckPass(passHash []byte, plainPassword string) bool {
@@ -37,7 +36,19 @@ func CheckPass(passHash []byte, plainPassword string) bool {
 	copy(salt, passHash[:8])
 	userHash := argon2.IDKey([]byte(plainPassword), salt, 1, 64*1024, 4, 32)
 	userHashedPassword := append(salt, userHash...)
-	return bytes.Equal(userHashedPassword, passHash)
+	return subtle.ConstantTimeCompare(userHashedPassword, passHash) == 1
+}
+
+// randomSecret возвращает строку из 32 случайных байт в base32.
+// Используется как пароль-заглушка для VK-аккаунтов: вход по логину/паролю
+// для них запрещён (см. SignInUser), но хранить общий константный пароль
+// недопустимо — иначе VK-аккаунт можно захватить через обычный /signin.
+func randomSecret() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return base32.StdEncoding.EncodeToString(buf), nil
 }
 
 type AuthUsecase struct {
@@ -57,7 +68,7 @@ func (uc *AuthUsecase) GenerateToken(id uuid.UUID, login string, version int) (s
 		"id":      id,
 		"login":   login,
 		"version": version,
-		"exp":     time.Now().Add(time.Hour * 24).Unix(),
+		"exp":     time.Now().Add(time.Hour * 12).Unix(),
 	})
 	return token.SignedString([]byte(uc.secret))
 }
@@ -89,7 +100,17 @@ func (uc *AuthUsecase) SignInVKUser(ctx context.Context, vkid string) (models.Us
 
 func (uc *AuthUsecase) SignUpVKUser(ctx context.Context, vkid string, login string) (models.User, string, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
-	passwordHash := HashPass("basic-vk-password")
+
+	randomPass, err := randomSecret()
+	if err != nil {
+		logger.Error("cannot generate vk password")
+		return models.User{}, "", auth.ErrorInternalServerError
+	}
+	passwordHash, err := HashPass(randomPass)
+	if err != nil {
+		logger.Error("cannot hash password")
+		return models.User{}, "", auth.ErrorInternalServerError
+	}
 
 	id := uuid.NewV4()
 	defaultAvatar := "avatars/default.png"
@@ -110,7 +131,7 @@ func (uc *AuthUsecase) SignUpVKUser(ctx context.Context, vkid string, login stri
 		UpdatedAt:    time.Now().UTC(),
 	}
 
-	err := uc.authRepo.CreateVKUser(ctx, user, vkid)
+	err = uc.authRepo.CreateVKUser(ctx, user, vkid)
 	if err != nil {
 		return models.User{}, "", err
 	}
@@ -142,7 +163,11 @@ func (uc *AuthUsecase) SignUpUser(ctx context.Context, req models.SignUpInput) (
 		return models.User{}, "", auth.ErrorConflict
 	}
 
-	passwordHash := HashPass(req.Password)
+	passwordHash, err := HashPass(req.Password)
+	if err != nil {
+		logger.Error("cannot hash password")
+		return models.User{}, "", auth.ErrorInternalServerError
+	}
 
 	id := uuid.NewV4()
 	defaultAvatar := "avatars/default.png"
@@ -195,6 +220,11 @@ func (uc *AuthUsecase) SignInUser(ctx context.Context, req models.SignInInput) (
 	neededUser, err := uc.authRepo.CheckUserLogin(ctx, req.Login)
 	if err != nil {
 		return models.User{}, "", err
+	}
+
+	if neededUser.IsForeign {
+		logger.Error("password login attempt on VK account")
+		return models.User{}, "", auth.ErrorBadRequest
 	}
 
 	if !CheckPass(neededUser.PasswordHash, req.Password) {
@@ -288,7 +318,8 @@ func (uc *AuthUsecase) ValidateAndGetUser(ctx context.Context, token string) (mo
 	}
 
 	if int(version) != user.Version {
-		return models.User{}, err
+		logger.Error("token version mismatch")
+		return models.User{}, auth.ErrorUnauthorized
 	}
 
 	return user, nil

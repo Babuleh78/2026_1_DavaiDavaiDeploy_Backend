@@ -25,6 +25,7 @@ import (
 	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/joho/godotenv"
 	"google.golang.org/grpc"
+	grpccreds "google.golang.org/grpc/credentials"
 
 	authHandler "DDDance/internal/pkg/auth/delivery/grpc"
 	authRepo "DDDance/internal/pkg/auth/repo"
@@ -80,13 +81,14 @@ func initS3Client(ctx context.Context) (*s3.Client, string, error) {
 		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
 	})
 
-	customHTTPClient := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
+	httpTransport := &http.Transport{
+		TLSNextProto: make(map[string]func(string, *tls.Conn) http.RoundTripper),
 	}
+	if os.Getenv("S3_INSECURE_TLS") == "true" {
+		log.Println("WARNING: проверка TLS-сертификата S3 отключена (S3_INSECURE_TLS=true)")
+		httpTransport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	customHTTPClient := &http.Client{Transport: httpTransport}
 
 	cfg, err := config.LoadDefaultConfig(ctx,
 		config.WithRegion(region),
@@ -108,6 +110,10 @@ func main() {
 	_ = godotenv.Load()
 	ctx := context.Background()
 
+	if os.Getenv("JWT_SECRET") == "" {
+		log.Fatal("JWT_SECRET is not set")
+	}
+
 	dbpool, err := initDB(ctx)
 	if err != nil {
 		log.Fatalf("Unable to connect to database: %v\n", err)
@@ -116,7 +122,7 @@ func main() {
 
 	s3Client, s3Bucket, err := initS3Client(ctx)
 	if err != nil {
-		log.Printf("Warning: Unable to connect to S3: %v\n", err)
+		log.Fatalf("Unable to connect to S3: %v\n", err)
 	}
 
 	authRepo := authRepo.NewAuthRepository(dbpool)
@@ -129,11 +135,25 @@ func main() {
 	authHandler := authHandler.NewGrpcAuthHandler(authUsecase, userUsecase)
 
 	ddLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	gRPCServer := grpc.NewServer(
+
+	grpcOpts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(logger.LoggerInterceptor(ddLogger)),
-		grpc.MaxRecvMsgSize(64*1024*1024),
-		grpc.MaxSendMsgSize(64*1024*1024),
-	)
+		grpc.MaxRecvMsgSize(64 * 1024 * 1024),
+		grpc.MaxSendMsgSize(64 * 1024 * 1024),
+	}
+
+	certFile, keyFile := os.Getenv("GRPC_TLS_CERT"), os.Getenv("GRPC_TLS_KEY")
+	if certFile != "" && keyFile != "" {
+		creds, err := grpccreds.NewServerTLSFromFile(certFile, keyFile)
+		if err != nil {
+			log.Fatalf("failed to load gRPC TLS cert: %v", err)
+		}
+		grpcOpts = append(grpcOpts, grpc.Creds(creds))
+		log.Println("gRPC server: TLS enabled")
+	} else {
+		log.Println("WARNING: gRPC server running WITHOUT TLS (GRPC_TLS_CERT/GRPC_TLS_KEY not set)")
+	}
+	gRPCServer := grpc.NewServer(grpcOpts...)
 	gen.RegisterAuthServer(gRPCServer, authHandler)
 
 	r := mux.NewRouter().PathPrefix("").Subrouter()

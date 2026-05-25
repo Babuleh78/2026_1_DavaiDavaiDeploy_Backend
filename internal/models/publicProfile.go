@@ -1,0 +1,46 @@
+package models
+
+import (
+	"time"
+
+	uuid "github.com/satori/go.uuid"
+)
+
+type SavedAttemptItem struct {
+	UserDanceID       string    `json:"user_dance_id"`
+	DanceID           string    `json:"dance_id"`
+	DanceTitle        string    `json:"dance_title"`
+	UserName          string    `json:"user_name"`
+	IsPrivate         bool      `json:"is_private"`
+	Score             float64   `json:"score"`
+	SavedAt           time.Time `json:"saved_at"`
+	ReferenceVideoKey string    `json:"reference_video_key"`
+	UserAnimationKey  string    `json:"user_animation_key"`
+	UserSkeletonKey   string    `json:"user_skeleton_key"`
+	UserVideoKey      string    `json:"user_video_key,omitempty"`
+	HasVideo          bool      `json:"has_video"`
+}
+
+type PersonalTopItem struct {
+	DanceID     string    `json:"dance_id"`
+	UserDanceID string    `json:"user_dance_id"`
+	DanceTitle  string    `json:"dance_title"`
+	BestScore   float64   `json:"best_score"`
+	AchievedAt  time.Time `json:"achieved_at"`
+}
+
+type PublicProfileUser struct {
+	ID        uuid.UUID `json:"id"`
+	Login     string    `json:"login"`
+	Avatar    string    `json:"avatar"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type PublicProfileResponse struct {
+	User             PublicProfileUser  `json:"user"`
+	SavedAttempts    []SavedAttemptItem `json:"saved_attempts"`
+	PersonalTop      []PersonalTopItem  `json:"personal_top"`
+	IsOwnProfile     bool               `json:"is_own_profile"`
+	FriendsCount     int                `json:"friends_count"`
+	FriendshipStatus *FriendshipStatus  `json:"friendship_status,omitempty"`
+}

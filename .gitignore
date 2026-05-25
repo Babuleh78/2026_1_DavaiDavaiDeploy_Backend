@@ -33,3 +33,6 @@ go*.linux-amd64.tar.gz
 .env.*.local
 coverprofile.tmp
 coverage.html
+
+
+build/certs/

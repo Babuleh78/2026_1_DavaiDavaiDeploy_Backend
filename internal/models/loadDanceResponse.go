@@ -15,7 +15,12 @@ type LoadDanceResponse struct {
     NumSegmentsRendered int      `json:"num_segments_rendered"`
     VideoPath           string   `json:"video_path"`
     LikesCount          int64    `json:"likes_count"`
-    IsLiked             bool     `json:"is_liked"` 
+    IsLiked             bool     `json:"is_liked"`
+    Author              *DanceAuthor `json:"author,omitempty"`
+    Difficulty          string   `json:"difficulty,omitempty"`
+    DifficultyByUsers   bool     `json:"difficulty_by_users"`
+    LastAttemptID       string   `json:"last_attempt_id,omitempty"`
+    LastAttemptScore    *float64 `json:"last_attempt_score,omitempty"`
 }
 
 func (l *LoadDanceResponse) Sanitize() {

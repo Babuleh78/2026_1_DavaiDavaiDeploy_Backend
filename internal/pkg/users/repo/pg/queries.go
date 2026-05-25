@@ -11,6 +11,9 @@ var GetUserByLoginQuery string
 //go:embed sql/updateUserPasswordQuery.sql
 var UpdateUserPasswordQuery string
 
+//go:embed sql/updateUserProfileQuery.sql
+var UpdateUserProfileQuery string
+
 //go:embed sql/addToHistoryQuery.sql
 var AddToHistoryQuery string
 
@@ -49,3 +52,132 @@ var SaveRatingQuery string
 
 //go:embed sql/getAggregatedRatingQuery.sql
 var GetAggregatedRatingQuery string
+
+//go:embed sql/createDanceQuery.sql
+var CreateDanceQuery string
+
+//go:embed sql/updateDanceStatusQuery.sql
+var UpdateDanceStatusQuery string
+
+//go:embed sql/getDanceStatusQuery.sql
+var GetDanceStatusQuery string
+
+//go:embed sql/recordDanceAttemptQuery.sql
+var RecordDanceAttemptQuery string
+
+//go:embed sql/getDanceCatalogCountQuery.sql
+var GetDanceCatalogCountQuery string
+
+//go:embed sql/getDanceStatsQuery.sql
+var GetDanceStatsQuery string
+
+//go:embed sql/getDancesEnrichedInfoQuery.sql
+var GetDancesEnrichedInfoQuery string
+
+//go:embed sql/getDanceTrendingQuery.sql
+var GetDanceTrendingQuery string
+
+//go:embed sql/getLeaderboardQuery.sql
+var GetLeaderboardQuery string
+
+//go:embed sql/getUserDanceRankQuery.sql
+var GetUserDanceRankQuery string
+
+//go:embed sql/getDanceVideoPathQuery.sql
+var GetDanceVideoPathQuery string
+
+//go:embed sql/saveAttemptQuery.sql
+var SaveAttemptQuery string
+
+//go:embed sql/unsaveAttemptQuery.sql
+var UnsaveAttemptQuery string
+
+//go:embed sql/getSavedAttemptsQuery.sql
+var GetSavedAttemptsQuery string
+
+//go:embed sql/getPersonalTopQuery.sql
+var GetPersonalTopQuery string
+
+//go:embed sql/getUserAttemptsQuery.sql
+var GetUserAttemptsQuery string
+
+//go:embed sql/getLastAttemptQuery.sql
+var GetLastAttemptQuery string
+
+//go:embed sql/getAttemptOwnerQuery.sql
+var GetAttemptOwnerQuery string
+
+//go:embed sql/isSavedAttemptWithVideoQuery.sql
+var IsSavedAttemptWithVideoQuery string
+
+//go:embed sql/recordDanceViewQuery.sql
+var RecordDanceViewQuery string
+
+//go:embed sql/linkDanceUploadQuery.sql
+var LinkDanceUploadQuery string
+
+//go:embed sql/getDanceUploadersQuery.sql
+var GetDanceUploadersQuery string
+
+//go:embed sql/getDanceAuthorQuery.sql
+var GetDanceAuthorQuery string
+
+//go:embed sql/setDanceModerationReasonQuery.sql
+var SetDanceModerationReasonQuery string
+
+//go:embed sql/getDanceModerationReasonQuery.sql
+var GetDanceModerationReasonQuery string
+
+//go:embed sql/createNotificationQuery.sql
+var CreateNotificationQuery string
+
+//go:embed sql/createFriendNotificationQuery.sql
+var CreateFriendNotificationQuery string
+
+//go:embed sql/getNotificationsQuery.sql
+var GetNotificationsQuery string
+
+//go:embed sql/markNotificationReadQuery.sql
+var MarkNotificationReadQuery string
+
+//go:embed sql/markAllNotificationsReadQuery.sql
+var MarkAllNotificationsReadQuery string
+
+//go:embed sql/createFriendshipQuery.sql
+var CreateFriendshipQuery string
+
+//go:embed sql/updateFriendshipStatusQuery.sql
+var UpdateFriendshipStatusQuery string
+
+//go:embed sql/getFriendsQuery.sql
+var GetFriendsQuery string
+
+//go:embed sql/getFriendshipBetweenQuery.sql
+var GetFriendshipBetweenQuery string
+
+//go:embed sql/deleteFriendshipQuery.sql
+var DeleteFriendshipQuery string
+
+//go:embed sql/getFriendsCountQuery.sql
+var GetFriendsCountQuery string
+
+//go:embed sql/getUploadedDancesByUserQuery.sql
+var GetUploadedDancesByUserQuery string
+
+//go:embed sql/updateDanceTitleQuery.sql
+var UpdateDanceTitleQuery string
+
+//go:embed sql/updateDanceDifficultyQuery.sql
+var UpdateDanceDifficultyQuery string
+
+//go:embed sql/createCompareTaskQuery.sql
+var CreateCompareTaskQuery string
+
+//go:embed sql/getCompareTaskQuery.sql
+var GetCompareTaskQuery string
+
+//go:embed sql/markCompareTaskFinalizedQuery.sql
+var MarkCompareTaskFinalizedQuery string
+
+//go:embed sql/getPublishedDanceIDsQuery.sql
+var GetPublishedDanceIDsQuery string

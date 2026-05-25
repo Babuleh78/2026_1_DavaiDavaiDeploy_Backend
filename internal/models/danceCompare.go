@@ -12,9 +12,7 @@ type DanceCompareRequest struct {
     SegmentIdx int    `json:"segment_idx"`
 }
 
-// UnmarshalJSON custom JSON unmarshaler to handle dance_id as either string or number
 func (d *DanceCompareRequest) UnmarshalJSON(data []byte) error {
-	// Use interface{} to accept any type
 	aux := &struct {
 		VideoKey   interface{} `json:"video_key"`
 		DanceID    interface{} `json:"dance_id"`
@@ -25,12 +23,10 @@ func (d *DanceCompareRequest) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// Convert VideoKey
 	if aux.VideoKey != nil {
 		d.VideoKey = fmt.Sprintf("%v", aux.VideoKey)
 	}
 
-	// Convert DanceID - handle both string and number
 	if aux.DanceID != nil {
 		switch v := aux.DanceID.(type) {
 		case string:
@@ -40,7 +36,6 @@ func (d *DanceCompareRequest) UnmarshalJSON(data []byte) error {
 		}
 	}
 
-	// Convert SegmentIdx
 	if aux.SegmentIdx != nil {
 		switch v := aux.SegmentIdx.(type) {
 		case float64:

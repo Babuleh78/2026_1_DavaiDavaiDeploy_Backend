@@ -11,7 +11,7 @@ func Validation(login, password string) (string, bool) {
 		return "Invalid login length", false
 	}
 
-	if len(password) < 6 || len(password) > 15 {
+	if len(password) < 8 || len(password) > 128 {
 		return "Invalid password length", false
 	}
 

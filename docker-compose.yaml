@@ -35,6 +35,9 @@ services:
     environment:
       AUTH_SERVICE_HOST: auth
       AUTH_SERVICE_PORT: 5459
+      GRPC_TLS_CA: /certs/ca.crt
+    volumes:
+      - ./build/certs:/certs:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,6 +45,7 @@ services:
         condition: service_started
     networks:
       - ddd-network
+      - ml-internal
 
   auth:
     build:
@@ -52,6 +56,11 @@ services:
     restart: unless-stopped
     env_file:
       - .env
+    environment:
+      GRPC_TLS_CERT: /certs/auth-server.crt
+      GRPC_TLS_KEY: /certs/auth-server.key
+    volumes:
+      - ./build/certs:/certs:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,3 +73,5 @@ volumes:
 networks:
   ddd-network:
     name: ddd-network
+  ml-internal:
+    name: ml-internal

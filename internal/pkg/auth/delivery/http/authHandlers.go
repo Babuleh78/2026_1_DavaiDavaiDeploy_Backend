@@ -7,7 +7,6 @@ import (
 	"DDDance/internal/pkg/helpers"
 	"DDDance/internal/pkg/utils/log"
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"io"
@@ -33,7 +32,6 @@ type AuthHandler struct {
 	CookieSecure   bool
 	CookieSamesite http.SameSite
 	client         gen.AuthClient
-	usecase        auth.AuthUsecase
 }
 
 func NewAuthHandler(client gen.AuthClient, usecase auth.AuthUsecase) *AuthHandler {
@@ -263,11 +261,6 @@ func (a *AuthHandler) VKAuth(w http.ResponseWriter, r *http.Request) {
 	vkReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{
-				InsecureSkipVerify: true,
-			},
-		},
 		Timeout: 10 * time.Second,
 	}
 
@@ -279,19 +272,17 @@ func (a *AuthHandler) VKAuth(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 	bodyBytes, _ := io.ReadAll(resp.Body)
-	logger.Info("VK API raw response", "body", string(bodyBytes))
+
+	if resp.StatusCode != http.StatusOK {
+		log.LogHandlerError(logger, errors.New("VK API returned non-200 status"), http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
 
 	var vkUser models.VKAuthResponse
 	err = json.Unmarshal(bodyBytes, &vkUser)
 	if err != nil {
 		log.LogHandlerError(logger, errors.New("Decoding error"), http.StatusBadRequest)
-		helpers.WriteError(w, http.StatusBadRequest)
-		return
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		log.LogHandlerError(logger, errors.New("VK API error: "+string(body)), http.StatusBadRequest)
 		helpers.WriteError(w, http.StatusBadRequest)
 		return
 	}

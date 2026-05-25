@@ -267,10 +267,15 @@ func (g GrpcAuthHandler) ChangePassword(ctx context.Context, in *gen.ChangePassw
 }
 
 func (g GrpcAuthHandler) CompareDance(ctx context.Context, in *gen.CompareDanceRequest) (*gen.CompareDanceResponse, error) {
-    userID := uuid.FromStringOrNil(in.UserID)
-	
+    var userIDPtr *uuid.UUID
+    if in.UserID != "" {
+        id := uuid.FromStringOrNil(in.UserID)
+        if id != uuid.Nil {
+            userIDPtr = &id
+        }
+    }
 
-    result, err := g.uuc.CompareDanceFromBuffer(ctx, in.Dance, in.FileFormat, in.ReferenceDanceID, userID)
+    result, err := g.uuc.CompareDanceFromBuffer(ctx, in.Dance, in.FileFormat, in.ReferenceDanceID, userIDPtr)
     if err != nil {
         switch err {
         case users.ErrorNotFound:

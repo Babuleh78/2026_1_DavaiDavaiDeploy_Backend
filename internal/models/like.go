@@ -17,6 +17,7 @@ type DanceLike struct {
     HistoryID string    `json:"history_id"`
     DanceID   string    `json:"dance_id"`
     Name      string    `json:"name"`
+    DanceTitle string   `json:"dance_title"`
     CreatedAt time.Time `json:"created_at"`
 }
 
