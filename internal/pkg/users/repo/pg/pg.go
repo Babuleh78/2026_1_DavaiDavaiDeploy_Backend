@@ -478,6 +478,7 @@ func (u *UserRepository) GetDanceCatalog(ctx context.Context, sort, search strin
             COALESCE(COUNT(a.id), 0)::bigint                    AS attempt_count,
             COALESCE(AVG(a.score), 0)::float                    AS avg_score,
             COALESCE(MAX(vc.view_count), 0)::bigint             AS view_count,
+            COALESCE(MAX(lk.like_count), 0)::bigint             AS like_count,
             (COALESCE(MAX(dr.rating_count), 0) >= %d)           AS difficulty_by_users,
             CASE WHEN COALESCE(MAX(dr.rating_count), 0) >= %d
                  THEN ROUND((MAX(dr.avg_diff) - 2) / 8.0 * 100)::int
@@ -490,6 +491,11 @@ func (u *UserRepository) GetDanceCatalog(ctx context.Context, sort, search strin
             FROM dance_views
             GROUP BY dance_id
         ) vc ON vc.dance_id = d.id
+        LEFT JOIN (
+            SELECT dance_id, COUNT(DISTINCT user_id)::bigint AS like_count
+            FROM dance_likes
+            GROUP BY dance_id
+        ) lk ON lk.dance_id = d.id
         LEFT JOIN (
             SELECT video_id,
                    COUNT(*)::int AS rating_count,
@@ -521,7 +527,7 @@ func (u *UserRepository) GetDanceCatalog(ctx context.Context, sort, search strin
 	for rows.Next() {
 		var item models.DanceCatalogItem
 		var hasAuthor bool
-		if err := rows.Scan(&item.ID, &item.Title, &item.CreatedAt, &item.AttemptCount, &item.AvgScore, &item.ViewCount, &item.DifficultyByUsers, &item.DifficultyScore, &hasAuthor); err != nil {
+		if err := rows.Scan(&item.ID, &item.Title, &item.CreatedAt, &item.AttemptCount, &item.AvgScore, &item.ViewCount, &item.LikeCount, &item.DifficultyByUsers, &item.DifficultyScore, &hasAuthor); err != nil {
 			logger.Error("failed to scan catalog item: " + err.Error())
 			return nil, users.ErrorInternalServerError
 		}
