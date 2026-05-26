@@ -302,6 +302,7 @@ func main() {
 	notificationsRouter.HandleFunc("", userHandler.GetNotifications).Methods(http.MethodGet, http.MethodOptions)
 	notificationsRouter.HandleFunc("/{id}/read", userHandler.MarkNotificationRead).Methods(http.MethodPost, http.MethodOptions)
 	notificationsRouter.HandleFunc("/read-all", userHandler.MarkAllNotificationsRead).Methods(http.MethodPost, http.MethodOptions)
+	notificationsRouter.HandleFunc("", userHandler.ClearNotifications).Methods(http.MethodDelete, http.MethodOptions)
 
 	uploadsRouter := apiRouter.PathPrefix("/uploads").Subrouter()
 	uploadsRouter.Use(userHandler.Middleware)

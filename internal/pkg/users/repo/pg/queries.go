@@ -143,6 +143,9 @@ var MarkNotificationReadQuery string
 //go:embed sql/markAllNotificationsReadQuery.sql
 var MarkAllNotificationsReadQuery string
 
+//go:embed sql/clearNotificationsQuery.sql
+var ClearNotificationsQuery string
+
 //go:embed sql/createFriendshipQuery.sql
 var CreateFriendshipQuery string
 

@@ -1060,6 +1060,16 @@ func (u *UserRepository) MarkAllNotificationsRead(ctx context.Context, userID uu
 	return nil
 }
 
+func (u *UserRepository) ClearNotifications(ctx context.Context, userID uuid.UUID) error {
+	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+	_, err := u.db.Exec(ctx, ClearNotificationsQuery, userID)
+	if err != nil {
+		logger.Error("failed to clear notifications: " + err.Error())
+		return users.ErrorInternalServerError
+	}
+	return nil
+}
+
 func (u *UserRepository) CreateFriendship(ctx context.Context, senderID, receiverID uuid.UUID) (int64, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 	var id int64

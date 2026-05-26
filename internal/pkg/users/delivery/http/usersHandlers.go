@@ -2080,6 +2080,32 @@ func (u *UserHandler) MarkAllNotificationsRead(w http.ResponseWriter, r *http.Re
     log.LogHandlerInfo(logger, "success", http.StatusNoContent)
 }
 
+// ClearNotifications godoc
+// @Summary      Удалить все уведомления пользователя
+// @Tags         notifications
+// @Security     ApiKeyAuth
+// @Success      204
+// @Failure      401
+// @Failure      500
+// @Router       /notifications [delete]
+func (u *UserHandler) ClearNotifications(w http.ResponseWriter, r *http.Request) {
+    logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+    user, ok := r.Context().Value(users.UserKey).(models.User)
+    if !ok {
+        helpers.WriteError(w, http.StatusUnauthorized)
+        return
+    }
+
+    if err := u.uc.ClearNotifications(r.Context(), user.ID); err != nil {
+        helpers.WriteError(w, http.StatusInternalServerError)
+        return
+    }
+
+    w.WriteHeader(http.StatusNoContent)
+    log.LogHandlerInfo(logger, "success", http.StatusNoContent)
+}
+
 // ClaimUploads godoc
 // @Summary      Закрепить за собой анонимные загрузки
 // @Description  После регистрации фронт отправляет dance_id, накопленные в localStorage

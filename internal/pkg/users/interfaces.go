@@ -46,6 +46,7 @@ type UsersUsecase interface {
 	GetNotifications(ctx context.Context, userID uuid.UUID) (*models.NotificationsResponse, error)
 	MarkNotificationRead(ctx context.Context, id int64, userID uuid.UUID) error
 	MarkAllNotificationsRead(ctx context.Context, userID uuid.UUID) error
+	ClearNotifications(ctx context.Context, userID uuid.UUID) error
 	ClaimDanceUploads(ctx context.Context, userID uuid.UUID, danceIDs []string) error
 	GetDanceCatalog(ctx context.Context, sort, search string, page, limit int) (*models.DanceCatalogResponse, error)
 	GetDanceStats(ctx context.Context, danceID string) (*models.DanceStats, error)
@@ -102,6 +103,7 @@ type UsersRepo interface {
 	GetNotifications(ctx context.Context, userID uuid.UUID) ([]models.Notification, error)
 	MarkNotificationRead(ctx context.Context, id int64, userID uuid.UUID) error
 	MarkAllNotificationsRead(ctx context.Context, userID uuid.UUID) error
+	ClearNotifications(ctx context.Context, userID uuid.UUID) error
 	RecordDanceAttempt(ctx context.Context, danceID string, userID *uuid.UUID, attemptID string, score float64) error
 	CreateCompareTask(ctx context.Context, taskID, danceID, userDanceID, videoKey string) error
 	GetCompareTask(ctx context.Context, taskID string) (models.CompareTask, error)

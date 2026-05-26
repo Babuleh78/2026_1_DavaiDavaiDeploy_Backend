@@ -1217,8 +1217,20 @@ func (uc *UserUsecase) GetTaskStatus(
 			return nil, users.ErrorInternalServerError
 		}
 
-		if finErr := uc.FinalizeUploadTask(ctx, danceID, &mlResult, uploaderUserID); finErr != nil && finErr != users.ErrorModerationPending {
+		finErr := uc.FinalizeUploadTask(ctx, danceID, &mlResult, uploaderUserID)
+		if finErr != nil && finErr != users.ErrorModerationPending {
 			logger.Warn("FinalizeUploadTask error", "error", finErr)
+		}
+
+		// Танец не прошёл модерацию — сигналим фронту явно. Раньше тут
+		// собирался обычный LoadDanceResponse, и фронт показывал попап
+		// «введите название» для несуществующего (pending) танца.
+		if finErr == users.ErrorModerationPending || mlResult.Status == "moderation_pending" {
+			out.Status = "failed"
+			out.ModerationFailed = true
+			out.ModerationReason = mlResult.Reason
+			out.Error = "moderation_failed"
+			return out, nil
 		}
 
 		loadResp := models.LoadDanceResponse{
@@ -1488,6 +1500,10 @@ func (uc *UserUsecase) MarkNotificationRead(ctx context.Context, id int64, userI
 
 func (uc *UserUsecase) MarkAllNotificationsRead(ctx context.Context, userID uuid.UUID) error {
 	return uc.userRepo.MarkAllNotificationsRead(ctx, userID)
+}
+
+func (uc *UserUsecase) ClearNotifications(ctx context.Context, userID uuid.UUID) error {
+	return uc.userRepo.ClearNotifications(ctx, userID)
 }
 
 func (uc *UserUsecase) ClaimDanceUploads(ctx context.Context, userID uuid.UUID, danceIDs []string) error {

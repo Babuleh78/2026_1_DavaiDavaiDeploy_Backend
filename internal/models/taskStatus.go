@@ -11,12 +11,14 @@ type AsyncEnqueueResult struct {
 }
 
 type TaskStatusResponse struct {
-	Status     string          `json:"status"` 
+	Status     string          `json:"status"`
 	Stage      string          `json:"stage"`
 	StageLabel string          `json:"stage_label"`
-	Progress   int             `json:"progress"` 
+	Progress   int             `json:"progress"`
 	Result     json.RawMessage `json:"result,omitempty"`
 	Error      string          `json:"error,omitempty"`
+	ModerationFailed bool   `json:"moderation_failed,omitempty"`
+	ModerationReason string `json:"moderation_reason,omitempty"`
 }
 
 type MlStatusResp struct {
