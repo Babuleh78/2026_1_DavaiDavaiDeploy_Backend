@@ -39,10 +39,6 @@ func CheckPass(passHash []byte, plainPassword string) bool {
 	return subtle.ConstantTimeCompare(userHashedPassword, passHash) == 1
 }
 
-// randomSecret возвращает строку из 32 случайных байт в base32.
-// Используется как пароль-заглушка для VK-аккаунтов: вход по логину/паролю
-// для них запрещён (см. SignInUser), но хранить общий константный пароль
-// недопустимо — иначе VK-аккаунт можно захватить через обычный /signin.
 func randomSecret() (string, error) {
 	buf := make([]byte, 32)
 	if _, err := rand.Read(buf); err != nil {
@@ -68,7 +64,7 @@ func (uc *AuthUsecase) GenerateToken(id uuid.UUID, login string, version int) (s
 		"id":      id,
 		"login":   login,
 		"version": version,
-		"exp":     time.Now().Add(time.Hour * 12).Unix(),
+		"exp":     time.Now().Add(30 * 24 * time.Hour).Unix(),
 	})
 	return token.SignedString([]byte(uc.secret))
 }
@@ -230,6 +226,22 @@ func (uc *AuthUsecase) SignInUser(ctx context.Context, req models.SignInInput) (
 	if !CheckPass(neededUser.PasswordHash, req.Password) {
 		logger.Error("wrong password")
 		return models.User{}, "", auth.ErrorBadRequest
+	}
+
+	has2FA, err := uc.authRepo.CheckUserTwoFactor(ctx, neededUser.ID)
+	if err != nil {
+		logger.Error("failed to check 2FA status", slog.Any("error", err))
+		return models.User{}, "", auth.ErrorInternalServerError
+	}
+	if has2FA {
+		if req.Code == nil || *req.Code == "" {
+			logger.Error("2FA code required but not provided")
+			return models.User{}, "", auth.ErrorBadRequest
+		}
+		secretCode := uc.authRepo.GetUserSecretCode(ctx, neededUser.ID)
+		if err := uc.VerifyOTPCode(ctx, req.Login, secretCode, *req.Code); err != nil {
+			return models.User{}, "", err
+		}
 	}
 
 	token, err := uc.GenerateToken(neededUser.ID, req.Login, neededUser.Version)

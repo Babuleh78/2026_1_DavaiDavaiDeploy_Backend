@@ -10,4 +10,5 @@ SELECT
 FROM saved_attempts sa
 LEFT JOIN dances d ON d.id = sa.dance_id
 WHERE sa.user_id = $1
-ORDER BY sa.created_at DESC;
+ORDER BY sa.created_at DESC
+LIMIT $2 OFFSET $3;

@@ -1,7 +1,7 @@
 package repo
 
 import (
-	"DDDance/internal/pkg/users"
+	"DDDance/internal/models"
 	"DDDance/internal/pkg/utils/log"
 	"bytes"
 	"context"
@@ -191,14 +191,14 @@ func (r *S3Repository) DeleteByPrefix(ctx context.Context, prefix string) error 
 	return firstErr
 }
 
-func (r *S3Repository) ListUserVideos(ctx context.Context) ([]users.StoredUserVideo, error) {
+func (r *S3Repository) ListUserVideos(ctx context.Context) ([]models.StoredUserVideo, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
 	if r.client == nil || r.bucket == "" {
 		return nil, errors.New("S3 client not configured")
 	}
 
-	out := make([]users.StoredUserVideo, 0, 64)
+	out := make([]models.StoredUserVideo, 0, 64)
 	var continuationToken *string
 
 	for {
@@ -224,7 +224,7 @@ func (r *S3Repository) ListUserVideos(ctx context.Context) ([]users.StoredUserVi
 			if obj.LastModified != nil {
 				lastMod = *obj.LastModified
 			}
-			out = append(out, users.StoredUserVideo{
+			out = append(out, models.StoredUserVideo{
 				Key:          *obj.Key,
 				UserID:       parts[1],
 				DanceID:      parts[2],

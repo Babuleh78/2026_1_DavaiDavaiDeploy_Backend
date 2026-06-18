@@ -12,6 +12,6 @@ type LeaderboardEntry struct {
 }
 
 type LeaderboardResponse struct {
-	Top       []LeaderboardEntry  `json:"top"`
-	UserEntry *LeaderboardEntry   `json:"user_entry,omitempty"`
+	Top       []LeaderboardEntry `json:"top"`
+	UserEntry *LeaderboardEntry  `json:"user_entry,omitempty"`
 }

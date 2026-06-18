@@ -15,4 +15,5 @@ type CompareStatusResult struct {
 	Segments        []SegmentDiagnostic `json:"segments"`
 	Tips            []CompareTip        `json:"tips"`
 	FrameScores     []FrameScore        `json:"frame_scores"`
+	FrameLabels     []FrameLabel        `json:"frame_labels,omitempty"`
 }

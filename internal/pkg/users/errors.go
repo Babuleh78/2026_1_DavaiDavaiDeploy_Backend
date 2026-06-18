@@ -10,4 +10,5 @@ var (
 	ErrorModerationPending   = errors.New("moderation pending")
 	ErrorAlreadyExists       = errors.New("already exists")
 	ErrorForbidden           = errors.New("forbidden")
+	ErrorConflict            = errors.New("conflict")
 )

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications
+  namespace: dddance-dev
+  labels:
+    app: notifications
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notifications
+  template:
+    metadata:
+      labels:
+        app: notifications
+    spec:
+      containers:
+        - name: notifications
+          image: dddance-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/app/notifications"]
+          ports:
+            - containerPort: 5460
+              name: grpc
+          envFrom:
+            - configMapRef:
+                name: backend-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: db-password
+            - name: REDIS_ADDR
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: redis-addr
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi

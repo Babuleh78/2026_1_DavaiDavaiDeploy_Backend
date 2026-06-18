@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package notifications;
+
+option go_package = "./internal/pkg/notifications/delivery/grpc/gen;gen";
+
+service Notifications {
+  rpc Send(NotificationRequest) returns (NotificationResponse) {}
+  rpc GetUnread(UserRequest) returns (NotificationsResponse) {}
+}
+
+message NotificationRequest {
+  string user_id      = 1;
+  string from_user_id = 2;
+  string type         = 3;
+  string payload      = 4;
+}
+
+message NotificationResponse {
+  bool ok = 1;
+}
+
+message UserRequest {
+  string user_id = 1;
+}
+
+message NotificationItem {
+  int64  id              = 1;
+  string type            = 2;
+  string from_user_id    = 3;
+  string payload         = 4;
+  bool   is_read         = 5;
+  int64  created_at_unix = 6;
+}
+
+message NotificationsResponse {
+  repeated NotificationItem notifications = 1;
+  int32 unread_count                      = 2;
+}

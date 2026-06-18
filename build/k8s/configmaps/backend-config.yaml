@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: dddance-dev
+data:
+  AUTH_SERVICE_HOST: "auth"
+  AUTH_SERVICE_PORT: "5459"
+  NOTIFICATIONS_HOST: "notifications"
+  NOTIFICATIONS_PORT: "5460"
+  KAFKA_BROKERS: "kafka:29092"
+  ML_SERVICE_URL: "http://ml-service:8000"
+  SERVER_PORT: "5458"
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "DDDance"

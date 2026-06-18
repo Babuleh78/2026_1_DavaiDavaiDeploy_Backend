@@ -101,6 +101,9 @@ var GetPersonalTopQuery string
 //go:embed sql/getUserAttemptsQuery.sql
 var GetUserAttemptsQuery string
 
+//go:embed sql/getDanceProgressQuery.sql
+var GetDanceProgressQuery string
+
 //go:embed sql/getLastAttemptQuery.sql
 var GetLastAttemptQuery string
 
@@ -109,6 +112,12 @@ var GetAttemptOwnerQuery string
 
 //go:embed sql/isSavedAttemptWithVideoQuery.sql
 var IsSavedAttemptWithVideoQuery string
+
+//go:embed sql/isAttemptPrivateQuery.sql
+var IsAttemptPrivateQuery string
+
+//go:embed sql/savedAttemptExistsQuery.sql
+var SavedAttemptExistsQuery string
 
 //go:embed sql/recordDanceViewQuery.sql
 var RecordDanceViewQuery string
@@ -155,6 +164,18 @@ var UpdateFriendshipStatusQuery string
 //go:embed sql/getFriendsQuery.sql
 var GetFriendsQuery string
 
+//go:embed sql/searchUsersQuery.sql
+var SearchUsersQuery string
+
+//go:embed sql/getActiveDuelsForUserDanceQuery.sql
+var GetActiveDuelsForUserDanceQuery string
+
+//go:embed sql/hasOpenDuelQuery.sql
+var HasOpenDuelQuery string
+
+//go:embed sql/ensureSavedAttemptForDuelQuery.sql
+var EnsureSavedAttemptForDuelQuery string
+
 //go:embed sql/getFriendshipBetweenQuery.sql
 var GetFriendshipBetweenQuery string
 
@@ -173,6 +194,9 @@ var UpdateDanceTitleQuery string
 //go:embed sql/updateDanceDifficultyQuery.sql
 var UpdateDanceDifficultyQuery string
 
+//go:embed sql/updateDanceDurationQuery.sql
+var UpdateDanceDurationQuery string
+
 //go:embed sql/createCompareTaskQuery.sql
 var CreateCompareTaskQuery string
 
@@ -184,3 +208,57 @@ var MarkCompareTaskFinalizedQuery string
 
 //go:embed sql/getPublishedDanceIDsQuery.sql
 var GetPublishedDanceIDsQuery string
+
+//go:embed sql/createDuelNotificationQuery.sql
+var CreateDuelNotificationQuery string
+
+//go:embed sql/getBatchDuelParticipantsQuery.sql
+var GetBatchDuelParticipantsQuery string
+
+//go:embed sql/getDanceViewCountQuery.sql
+var GetDanceViewCountQuery string
+
+//go:embed sql/botFindUserQuery.sql
+var BotFindUserQuery string
+
+//go:embed sql/botUpdateTelegramIDQuery.sql
+var BotUpdateTelegramIDQuery string
+
+//go:embed sql/botGetUserByTelegramIDQuery.sql
+var BotGetUserByTelegramIDQuery string
+
+//go:embed sql/getUserTelegramIDQuery.sql
+var GetUserTelegramIDQuery string
+
+//go:embed sql/getUserActivityQuery.sql
+var GetUserActivityQuery string
+
+//go:embed sql/getMostImprovedDanceQuery.sql
+var GetMostImprovedDanceQuery string
+
+//go:embed sql/getCreatorDailyStatsQuery.sql
+var GetCreatorDailyStatsQuery string
+
+//go:embed sql/getCreatorTopDancesQuery.sql
+var GetCreatorTopDancesQuery string
+
+//go:embed sql/getReelsAttemptsQuery.sql
+var GetReelsAttemptsQuery string
+
+//go:embed sql/getUserGlobalRankQuery.sql
+var GetUserGlobalRankQuery string
+
+//go:embed sql/getFriendsScoresQuery.sql
+var GetFriendsScoresQuery string
+
+//go:embed sql/getFriendsFeedQuery.sql
+var GetFriendsFeedQuery string
+
+//go:embed sql/getAvgUnlockedAchievementsQuery.sql
+var GetAvgUnlockedAchievementsQuery string
+
+//go:embed sql/getDuelStatsQuery.sql
+var GetDuelStatsQuery string
+
+//go:embed sql/getUserWeakSpotsQuery.sql
+var GetUserWeakSpotsQuery string

@@ -3,7 +3,8 @@ WITH best_per_dance AS (
         dance_id,
         attempt_id,
         score,
-        created_at
+        created_at,
+        user_name
     FROM saved_attempts
     WHERE user_id = $1
     ORDER BY dance_id, score DESC, created_at DESC
@@ -12,6 +13,7 @@ SELECT
     b.dance_id,
     b.attempt_id,
     COALESCE(d.title, '') AS title,
+    COALESCE(b.user_name, '') AS user_name,
     b.score      AS best_score,
     b.created_at AS last_attempt_at
 FROM best_per_dance b

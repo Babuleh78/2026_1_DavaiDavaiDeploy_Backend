@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: achievements-worker
+  namespace: dddance-dev
+  labels:
+    app: achievements-worker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: achievements-worker
+  template:
+    metadata:
+      labels:
+        app: achievements-worker
+    spec:
+      containers:
+        - name: achievements-worker
+          image: dddance-backend:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/app/achievements-worker"]
+          envFrom:
+            - configMapRef:
+                name: backend-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: db-password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi

@@ -1,0 +1,1 @@
+SELECT telegram_id FROM user_table WHERE id = $1

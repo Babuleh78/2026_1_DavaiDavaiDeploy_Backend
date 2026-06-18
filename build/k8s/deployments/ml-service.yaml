@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-service
+  namespace: dddance-dev
+  labels:
+    app: ml-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-service
+  template:
+    metadata:
+      labels:
+        app: ml-service
+    spec:
+      containers:
+        - name: api
+          image: dddance-ml:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          envFrom:
+            - configMapRef:
+                name: ml-config
+          env:
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ml-secrets
+                  key: s3-access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ml-secrets
+                  key: s3-secret-key
+            - name: ML_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ml-secrets
+                  key: ml-internal-token
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
+
+        - name: celery-worker
+          image: dddance-ml:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - celery
+            - -A
+            - app.worker.celery_app
+            - worker
+            - -Q
+            - video_processing,background
+            - --loglevel=info
+          envFrom:
+            - configMapRef:
+                name: ml-config
+          env:
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ml-secrets
+                  key: s3-access-key
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ml-secrets
+                  key: s3-secret-key
+            - name: ML_INTERNAL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ml-secrets
+                  key: ml-internal-token
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 2000m
+              memory: 4Gi

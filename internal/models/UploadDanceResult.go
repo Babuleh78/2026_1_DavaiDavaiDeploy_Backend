@@ -7,6 +7,8 @@ type UploadDanceResult struct {
 	VideoPath           string
 	FullGlbKey          string
 	GlbKeys             []string
+	KeyframesURL        string
+	Segments            []SegmentInfo
 	NumFrames           int
 	NumSegments         int
 	NumSegmentsRendered int
@@ -16,7 +18,8 @@ type UploadDanceResult struct {
 	Author              *DanceAuthor
 	Difficulty          string
 	DifficultyByUsers   bool
-	ModerationReason string
-	LastAttemptID    string
-	LastAttemptScore *float64
+	ModerationReason    string
+	LastAttemptID       string
+	LastAttemptScore    *float64
+	UniqueViewersApprox int64
 }

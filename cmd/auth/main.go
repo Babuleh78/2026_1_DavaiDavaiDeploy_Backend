@@ -131,7 +131,6 @@ func main() {
 	s3Repo := storageRepo.NewS3Repository(s3Client, s3Bucket)
 	userUsecase := userUsecase.NewUserUsecase(userRepo, s3Repo)
 
-	// инициализация gRPC хендлера
 	authHandler := authHandler.NewGrpcAuthHandler(authUsecase, userUsecase)
 
 	ddLogger := slog.New(slog.NewJSONHandler(os.Stdout, nil))

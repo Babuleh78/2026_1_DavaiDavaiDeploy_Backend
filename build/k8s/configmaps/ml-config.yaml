@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ml-config
+  namespace: dddance-dev
+data:
+  REDIS_URL: "redis://redis:6379/2"
+  S3_REGION: "ru-1"
+  S3_BUCKET: "dddance"
+  GPU_SERVER_URL: "http://model-server:9001"
+  CELERY_BROKER_URL: "redis://redis:6379/0"
+  CELERY_RESULT_BACKEND: "redis://redis:6379/1"

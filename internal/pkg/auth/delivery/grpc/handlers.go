@@ -36,7 +36,7 @@ func (g GrpcAuthHandler) SignupUser(ctx context.Context, in *gen.SignupRequest) 
 		switch err {
 		case auth.ErrorBadRequest:
 			return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-		case auth.ErrorConflict:
+		case auth.ErrorConflict, auth.ErrorLoginAlreadyExists:
 			return nil, status.Errorf(codes.AlreadyExists, "%v", err)
 		default:
 			return nil, status.Errorf(codes.Internal, "%v", err)
@@ -264,33 +264,4 @@ func (g GrpcAuthHandler) ChangePassword(ctx context.Context, in *gen.ChangePassw
 		JWTToken:  token,
 		CSRFToken: csrfToken,
 	}, err
-}
-
-func (g GrpcAuthHandler) CompareDance(ctx context.Context, in *gen.CompareDanceRequest) (*gen.CompareDanceResponse, error) {
-    var userIDPtr *uuid.UUID
-    if in.UserID != "" {
-        id := uuid.FromStringOrNil(in.UserID)
-        if id != uuid.Nil {
-            userIDPtr = &id
-        }
-    }
-
-    result, err := g.uuc.CompareDanceFromBuffer(ctx, in.Dance, in.FileFormat, in.ReferenceDanceID, userIDPtr)
-    if err != nil {
-        switch err {
-        case users.ErrorNotFound:
-            return nil, status.Errorf(codes.NotFound, "%v", err)
-        default:
-            return nil, status.Errorf(codes.Internal, "%v", err)
-        }
-    }
-
-    return &gen.CompareDanceResponse{
-        UserGlbKey:      result.UserGlbKey,
-        ReferenceGlbKey: result.ReferenceGlbKey,
-        Score:           result.Score,
-        DtwDistance:     result.DtwDistance,
-        UserDanceID:     result.UserDanceID,
-        DanceID:         result.DanceID,
-    }, nil
 }

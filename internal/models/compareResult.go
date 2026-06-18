@@ -17,6 +17,17 @@ type FrameScore struct {
 	JointErrors []float64 `json:"joint_errors,omitempty"`
 }
 
+type FrameLabel struct {
+	FrameIdx       int       `json:"frame_idx"`
+	TimestampMs    float64   `json:"timestamp_ms"`
+	Hit            bool      `json:"hit"`
+	Reason         string    `json:"reason"`
+	TimingScore    float64   `json:"timing_score"`
+	AmplitudeScore float64   `json:"amplitude_score"`
+	PoseScore      float64   `json:"pose_score"`
+	JointErrors    []float64 `json:"joint_errors,omitempty"`
+}
+
 type CompareAttemptOwner struct {
 	UserID string `json:"user_id"`
 	Login  string `json:"login"`
@@ -35,6 +46,7 @@ type CompareResult struct {
 	Tips                 []CompareTip         `json:"tips,omitempty"`
 	DanceStats           *CompareDanceStats   `json:"dance_stats,omitempty"`
 	FrameScores          []FrameScore         `json:"frame_scores,omitempty"`
+	FrameLabels          []FrameLabel         `json:"frame_labels,omitempty"`
 	UserVideoKey         string               `json:"user_video_key,omitempty"`
 	UserSkeletonKey      string               `json:"user_skeleton_key,omitempty"`
 	ReferenceSkeletonKey string               `json:"reference_skeleton_key,omitempty"`

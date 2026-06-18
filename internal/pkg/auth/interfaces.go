@@ -28,6 +28,7 @@ type AuthRepo interface {
 	IncrementUserVersion(ctx context.Context, userID uuid.UUID) error
 	GetUserByLogin(ctx context.Context, login string) (models.User, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (models.User, error)
+	CheckUserTwoFactor(ctx context.Context, userID uuid.UUID) (bool, error)
 	GetUserSecretCode(ctx context.Context, userID uuid.UUID) string
 	CreateVKUser(ctx context.Context, user models.User, vkid string) error
 	GetVKUser(ctx context.Context, vkid string) (models.User, error)

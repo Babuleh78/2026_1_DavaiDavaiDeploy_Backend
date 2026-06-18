@@ -23,8 +23,10 @@ import (
 )
 
 const (
-	CookieName     = "DDFilmsJWT"
-	CSRFCookieName = "DDFilmsCSRF"
+	CookieName     = "DDDanceJWT"
+	CSRFCookieName = "DDDanceCSRF"
+
+	sessionTTL = 30 * 24 * time.Hour // 1 month
 )
 
 type AuthHandler struct {
@@ -102,7 +104,7 @@ func (a *AuthHandler) SignupUser(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false,
 		Secure:   a.CookieSecure,
 		SameSite: a.CookieSamesite,
-		Expires:  time.Now().Add(12 * time.Hour),
+		Expires:  time.Now().Add(sessionTTL),
 		Path:     "/",
 	})
 
@@ -112,7 +114,7 @@ func (a *AuthHandler) SignupUser(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   a.CookieSecure,
 		SameSite: a.CookieSamesite,
-		Expires:  time.Now().Add(12 * time.Hour),
+		Expires:  time.Now().Add(sessionTTL),
 		Path:     "/",
 	})
 
@@ -185,7 +187,7 @@ func (a *AuthHandler) SignInUser(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false,
 		Secure:   a.CookieSecure,
 		SameSite: a.CookieSamesite,
-		Expires:  time.Now().Add(12 * time.Hour),
+		Expires:  time.Now().Add(sessionTTL),
 		Path:     "/",
 	})
 
@@ -195,7 +197,7 @@ func (a *AuthHandler) SignInUser(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   a.CookieSecure,
 		SameSite: a.CookieSamesite,
-		Expires:  time.Now().Add(12 * time.Hour),
+		Expires:  time.Now().Add(sessionTTL),
 		Path:     "/",
 	})
 
@@ -271,7 +273,13 @@ func (a *AuthHandler) VKAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer resp.Body.Close()
-	bodyBytes, _ := io.ReadAll(resp.Body)
+	resp.Body = http.MaxBytesReader(nil, resp.Body, 64*1024)
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.LogHandlerError(logger, err, http.StatusBadGateway)
+		helpers.WriteError(w, http.StatusBadGateway)
+		return
+	}
 
 	if resp.StatusCode != http.StatusOK {
 		log.LogHandlerError(logger, errors.New("VK API returned non-200 status"), http.StatusBadRequest)
@@ -320,7 +328,7 @@ func (a *AuthHandler) VKAuth(w http.ResponseWriter, r *http.Request) {
 			HttpOnly: false,
 			Secure:   a.CookieSecure,
 			SameSite: a.CookieSamesite,
-			Expires:  time.Now().Add(12 * time.Hour),
+			Expires:  time.Now().Add(sessionTTL),
 			Path:     "/",
 		})
 
@@ -330,7 +338,7 @@ func (a *AuthHandler) VKAuth(w http.ResponseWriter, r *http.Request) {
 			HttpOnly: true,
 			Secure:   a.CookieSecure,
 			SameSite: a.CookieSamesite,
-			Expires:  time.Now().Add(12 * time.Hour),
+			Expires:  time.Now().Add(sessionTTL),
 			Path:     "/",
 		})
 
@@ -373,7 +381,7 @@ func (a *AuthHandler) VKAuth(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false,
 		Secure:   a.CookieSecure,
 		SameSite: a.CookieSamesite,
-		Expires:  time.Now().Add(12 * time.Hour),
+		Expires:  time.Now().Add(sessionTTL),
 		Path:     "/",
 	})
 
@@ -383,7 +391,7 @@ func (a *AuthHandler) VKAuth(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   a.CookieSecure,
 		SameSite: a.CookieSamesite,
-		Expires:  time.Now().Add(12 * time.Hour),
+		Expires:  time.Now().Add(sessionTTL),
 		Path:     "/",
 	})
 
@@ -528,6 +536,7 @@ func (a *AuthHandler) LogOutUser(w http.ResponseWriter, r *http.Request) {
 		Secure:   a.CookieSecure,
 		SameSite: a.CookieSamesite,
 		Expires:  time.Now().Add(-12 * time.Hour),
+		MaxAge:   -1,
 		Path:     "/",
 	})
 
@@ -538,9 +547,9 @@ func (a *AuthHandler) LogOutUser(w http.ResponseWriter, r *http.Request) {
 		Secure:   a.CookieSecure,
 		SameSite: a.CookieSamesite,
 		Expires:  time.Now().Add(-12 * time.Hour),
+		MaxAge:   -1,
 		Path:     "/",
 	})
 
 	log.LogHandlerInfo(logger, "success", http.StatusOK)
 }
-
