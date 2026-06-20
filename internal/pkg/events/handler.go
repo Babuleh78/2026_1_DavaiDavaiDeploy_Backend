@@ -10,9 +10,12 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
+
+const heartbeatInterval = 20 * time.Second
 
 const maxConnsPerUser = 5
 
@@ -98,11 +101,17 @@ func (h *Handler) ServeSSE(w http.ResponseWriter, r *http.Request) {
 		cancel()
 	}()
 
+	heartbeat := time.NewTicker(heartbeatInterval)
+	defer heartbeat.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
 			logger.Info("SSE client disconnected", "user_id", userID)
 			return
+		case <-heartbeat.C:
+			fmt.Fprint(w, ": ping\n\n")
+			flusher.Flush()
 		case msg, open := <-ch:
 			if !open {
 				return

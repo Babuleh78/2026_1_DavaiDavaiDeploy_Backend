@@ -199,6 +199,150 @@ func (u *UserHandler) BotUpload(w http.ResponseWriter, r *http.Request) {
 	log.LogHandlerInfo(logger, "bot upload queued", http.StatusAccepted)
 }
 
+func (u *UserHandler) BotUploadDance(w http.ResponseWriter, r *http.Request) {
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+	const maxSize = 50 * 1024 * 1024
+	limitedReader := http.MaxBytesReader(w, r.Body, maxSize)
+	defer limitedReader.Close()
+	newReq := *r
+	newReq.Body = limitedReader
+
+	if err := newReq.ParseMultipartForm(maxSize); err != nil {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+	defer func() {
+		if newReq.MultipartForm != nil {
+			_ = newReq.MultipartForm.RemoveAll()
+		}
+	}()
+
+	telegramIDStr := newReq.FormValue("telegram_id")
+	if telegramIDStr == "" {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+	telegramID, err := strconv.ParseInt(telegramIDStr, 10, 64)
+	if err != nil || telegramID == 0 {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	botUser, err := u.uc.BotGetUserByTelegramID(r.Context(), telegramID)
+	if err != nil {
+		if errors.Is(err, users.ErrorNotFound) {
+			helpers.WriteError(w, http.StatusNotFound)
+			return
+		}
+		log.LogHandlerError(logger, err, http.StatusInternalServerError)
+		helpers.WriteError(w, http.StatusInternalServerError)
+		return
+	}
+
+	file, _, err := newReq.FormFile("video")
+	if err != nil {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	buffer, err := io.ReadAll(file)
+	if err != nil {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	buffer, err = helpers.ConvertToH264(buffer)
+	if err != nil {
+		log.LogHandlerError(logger, err, http.StatusBadRequest)
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	result, err := u.danceUC.UploadDance(r.Context(), buffer, "video/mp4", botUser.ID.String(), botUser.Login)
+	if err != nil {
+		if errors.Is(err, users.ErrorModerationPending) {
+			danceID, reason := "", ""
+			if result != nil {
+				danceID = result.DanceID
+				reason = result.ModerationReason
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"dance_id": danceID,
+				"status":   "moderation_pending",
+				"reason":   reason,
+			})
+			log.LogHandlerInfo(logger, "bot dance upload moderation pending", http.StatusOK)
+			return
+		}
+		switch {
+		case errors.Is(err, users.ErrorBadRequest):
+			helpers.WriteError(w, http.StatusBadRequest)
+		default:
+			log.LogHandlerError(logger, err, http.StatusInternalServerError)
+			helpers.WriteError(w, http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+	_ = json.NewEncoder(w).Encode(models.AsyncEnqueueResult{
+		TaskID:  result.TaskID,
+		DanceID: result.DanceID,
+		Status:  "processing",
+	})
+	log.LogHandlerInfo(logger, "bot dance upload queued", http.StatusAccepted)
+}
+
+func (u *UserHandler) BotUploadDanceStatus(w http.ResponseWriter, r *http.Request) {
+	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
+
+	taskID := mux.Vars(r)["task_id"]
+	if taskID == "" {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	telegramIDStr := r.URL.Query().Get("telegram_id")
+	telegramID, err := strconv.ParseInt(telegramIDStr, 10, 64)
+	if err != nil || telegramID == 0 {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	danceID := r.URL.Query().Get("dance_id")
+	if danceID == "" {
+		helpers.WriteError(w, http.StatusBadRequest)
+		return
+	}
+
+	botUser, err := u.uc.BotGetUserByTelegramID(r.Context(), telegramID)
+	if err != nil {
+		if errors.Is(err, users.ErrorNotFound) {
+			helpers.WriteError(w, http.StatusNotFound)
+			return
+		}
+		log.LogHandlerError(logger, err, http.StatusInternalServerError)
+		helpers.WriteError(w, http.StatusInternalServerError)
+		return
+	}
+
+	userID := botUser.ID
+	status, err := u.compUC.GetTaskStatus(r.Context(), taskID, "upload", danceID, "", "", botUser.ID.String(), &userID)
+	if err != nil {
+		log.LogHandlerError(logger, err, http.StatusInternalServerError)
+		helpers.WriteError(w, http.StatusInternalServerError)
+		return
+	}
+
+	helpers.WriteJSON(w, status)
+	log.LogHandlerInfo(logger, "bot dance upload status", http.StatusOK)
+}
+
 func (u *UserHandler) BotTaskStatus(w http.ResponseWriter, r *http.Request) {
 	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 

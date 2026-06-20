@@ -5,6 +5,7 @@ import (
 	appmetrics "DDDance/internal/pkg/metrics"
 	"DDDance/internal/pkg/utils/log"
 	"context"
+	"encoding/json"
 	"log/slog"
 	"math"
 	"sync"
@@ -131,6 +132,20 @@ func (uc *UserUsecase) CheckAndUnlockAchievements(ctx context.Context, userID uu
 				"description": ac.Description,
 				"code":        ac.Code,
 			})
+			if uc.ssePublisher != nil {
+				payload, mErr := json.Marshal(map[string]any{
+					"type":        "achievement_unlocked",
+					"id":          ac.ID,
+					"title":       ac.Title,
+					"description": ac.Description,
+					"icon_key":    ac.IconKey,
+				})
+				if mErr == nil {
+					if pErr := uc.ssePublisher.Publish(detached, userID.String(), payload); pErr != nil {
+						logger.Warn("failed to publish achievement SSE", "code", ac.Code, "error", pErr)
+					}
+				}
+			}
 		}
 	}
 

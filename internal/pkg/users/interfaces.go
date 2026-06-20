@@ -94,3 +94,7 @@ type NotificationSender interface {
 type KafkaPublisher interface {
 	PublishAsync(ctx context.Context, topic, key string, value []byte, errFn func(error))
 }
+
+type SSEPublisher interface {
+	Publish(ctx context.Context, userID string, payload []byte) error
+}

@@ -260,6 +260,7 @@ func main() {
 		danceUC.SetViewCache(viewCache)
 		danceUC.SetMLLock(redisRepo.NewMLLock(redisAddr))
 		usersUC.SetBotNotifier(redisRepo.NewBotNotifier(redisAddr))
+		usersUC.SetSSEPublisher(redisRepo.NewSSEPublisher(redisAddr))
 		log.Println("Redis view cache, ML lock, and bot notifier enabled:", redisAddr)
 	}
 
@@ -321,6 +322,7 @@ func main() {
 	authHandler := authHandlers.NewAuthHandler(authClient, authUsecase)
 	userHandler := userHandlers.NewUserHandler(authClient, usersUC)
 	userHandler.SetComparisonUsecase(comparisonUC)
+	userHandler.SetDanceUsecase(danceUC)
 	danceHandler := danceHttp.NewDanceHandler(danceUC)
 	comparisonHandler := comparisonHttp.NewComparisonHandler(comparisonUC)
 	socialHandler := socialHttp.NewSocialHandler(socialUC)
@@ -498,6 +500,13 @@ func main() {
 	} else {
 		botRouter.Handle("/upload", botUploadHandler).Methods(http.MethodPost, http.MethodOptions)
 	}
+	botUploadDanceHandler := http.HandlerFunc(userHandler.BotUploadDance)
+	if botUploadRL != nil {
+		botRouter.Handle("/upload_dance", botUploadRL(botUploadDanceHandler)).Methods(http.MethodPost, http.MethodOptions)
+	} else {
+		botRouter.Handle("/upload_dance", botUploadDanceHandler).Methods(http.MethodPost, http.MethodOptions)
+	}
+	botRouter.HandleFunc("/upload_dance/{task_id}/status", userHandler.BotUploadDanceStatus).Methods(http.MethodGet, http.MethodOptions)
 	botRouter.HandleFunc("/notify", userHandler.BotNotify).Methods(http.MethodPost, http.MethodOptions)
 	botRouter.HandleFunc("/duels", userHandler.BotGetDuels).Methods(http.MethodGet, http.MethodOptions)
 	botRouter.HandleFunc("/duels/{duel_id}/accept", userHandler.BotAcceptDuel).Methods(http.MethodPost, http.MethodOptions)

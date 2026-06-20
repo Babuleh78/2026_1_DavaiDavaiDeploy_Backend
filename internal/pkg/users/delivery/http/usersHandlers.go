@@ -4,6 +4,7 @@ import (
 	"DDDance/internal/models"
 	"DDDance/internal/pkg/auth/delivery/grpc/gen"
 	"DDDance/internal/pkg/comparison"
+	"DDDance/internal/pkg/dance"
 	"DDDance/internal/pkg/helpers"
 	"DDDance/internal/pkg/users"
 	"DDDance/internal/pkg/utils/log"
@@ -34,6 +35,7 @@ type UserHandler struct {
 	client         gen.AuthClient
 	uc             users.UsersUsecase
 	compUC         comparison.ComparisonUsecase
+	danceUC        dance.DanceUsecase
 	cookieSecure   bool
 	cookieSamesite http.SameSite
 }
@@ -57,6 +59,10 @@ func NewUserHandler(client gen.AuthClient, uc users.UsersUsecase) *UserHandler {
 
 func (u *UserHandler) SetComparisonUsecase(uc comparison.ComparisonUsecase) {
 	u.compUC = uc
+}
+
+func (u *UserHandler) SetDanceUsecase(uc dance.DanceUsecase) {
+	u.danceUC = uc
 }
 
 func (u *UserHandler) JWTMiddleware(next http.Handler) http.Handler {

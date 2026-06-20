@@ -41,6 +41,7 @@ type UserUsecase struct {
 	botNotifier   users.BotNotifier
 	notifSender   users.NotificationSender
 	kafkaProducer users.KafkaPublisher
+	ssePublisher  users.SSEPublisher
 }
 
 func NewUserUsecase(userRepo users.UsersRepo, storageRepo users.StorageRepo) *UserUsecase {
@@ -66,6 +67,10 @@ func (uc *UserUsecase) SetNotificationSender(ns users.NotificationSender) {
 
 func (uc *UserUsecase) SetKafkaProducer(kp users.KafkaPublisher) {
 	uc.kafkaProducer = kp
+}
+
+func (uc *UserUsecase) SetSSEPublisher(sp users.SSEPublisher) {
+	uc.ssePublisher = sp
 }
 
 func (uc *UserUsecase) GenerateToken(id uuid.UUID, login string, version int) (string, error) {
