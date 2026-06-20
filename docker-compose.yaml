@@ -1,3 +1,4 @@
+
 services:
   postgres:
     build:
@@ -10,7 +11,7 @@ services:
     environment:
       POSTGRES_DB: DDDance
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_PASSWORD: ${DB_PASS}
     volumes:
       - ./build/sql/:/docker-entrypoint-initdb.d/
       - postgres_data:/var/lib/postgresql/data
@@ -22,38 +23,59 @@ services:
     networks:
       - ddd-network
 
-  main:
-    build:
-      context: .
-      dockerfile: ./build/main.Dockerfile
-    container_name: main
+  redis:
+    image: redis:7-alpine
+    container_name: redis
     restart: unless-stopped
-    env_file:
-      - .env
-    ports:
-      - "127.0.0.1:5458:5458"
-    environment:
-      AUTH_SERVICE_HOST: auth
-      AUTH_SERVICE_PORT: 5459
-      GRPC_TLS_CA: /certs/ca.crt
-    volumes:
-      - ./build/certs:/certs:ro
-    depends_on:
-      postgres:
-        condition: service_healthy
-      auth:
-        condition: service_started
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - ddd-network
-      - ml-internal
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - ddd-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "127.0.0.1:9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - ddd-network
 
   auth:
     build:
       context: .
       dockerfile: ./build/auth.Dockerfile
+    container_name: auth
+    restart: unless-stopped
     expose:
       - "5459"
-    restart: unless-stopped
     env_file:
       - .env
     environment:
@@ -64,6 +86,142 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - ddd-network
+
+  notifications:
+    build:
+      context: .
+      dockerfile: ./build/notifications.Dockerfile
+    container_name: notifications
+    restart: unless-stopped
+    expose:
+      - "5460"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - ddd-network
+
+  main:
+    build:
+      context: .
+      dockerfile: ./build/main.Dockerfile
+    container_name: main
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5458:5458"
+    env_file:
+      - .env
+    environment:
+      AUTH_SERVICE_HOST: auth
+      AUTH_SERVICE_PORT: 5459
+      GRPC_TLS_CA: /certs/ca.crt
+    volumes:
+      - ./build/certs:/certs:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      auth:
+        condition: service_started
+      notifications:
+        condition: service_started
+    networks:
+      - ddd-network
+      - ml-internal
+
+  achievements-worker:
+    build:
+      context: .
+      dockerfile: ./build/achievements-worker.Dockerfile
+    container_name: achievements-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - ddd-network
+
+  streak-worker:
+    build:
+      context: .
+      dockerfile: ./build/streak-worker.Dockerfile
+    container_name: streak-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - ddd-network
+
+  analytics-worker:
+    build:
+      context: .
+      dockerfile: ./build/analytics-worker.Dockerfile
+    container_name: analytics-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - ddd-network
+
+  recommendation-worker:
+    build:
+      context: .
+      dockerfile: ./build/recommendation-worker.Dockerfile
+    container_name: recommendation-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - ddd-network
+      - ml-internal
+
+  activity-feed-worker:
+    build:
+      context: .
+      dockerfile: ./build/activity-feed-worker.Dockerfile
+    container_name: activity-feed-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - ddd-network
 
