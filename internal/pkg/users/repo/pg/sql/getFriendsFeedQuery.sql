@@ -1,6 +1,6 @@
 SELECT af.id::text, af.action_type, af.metadata, af.created_at,
        u.login AS actor_login, COALESCE(u.avatar, '') AS actor_avatar,
-       COALESCE(d.title, '') AS dance_title
+       COALESCE(d.title, '') AS dance_title, af.actor_id::text AS actor_id
 FROM activity_feed af
 JOIN user_table u ON u.id = af.actor_id
 LEFT JOIN dances d ON d.id = af.metadata->>'dance_id'

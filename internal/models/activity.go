@@ -12,6 +12,7 @@ type FeedItem struct {
 	CreatedAt   time.Time       `json:"created_at"`
 	ActorLogin  string          `json:"actor_login"`
 	ActorAvatar string          `json:"actor_avatar"`
+	ActorID     string          `json:"actor_id"`
 	DanceTitle  string          `json:"dance_title,omitempty"`
 }
 

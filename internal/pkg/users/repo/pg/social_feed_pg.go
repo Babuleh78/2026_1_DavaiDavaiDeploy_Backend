@@ -38,7 +38,7 @@ func (u *UserRepository) GetFriendsFeed(ctx context.Context, userID uuid.UUID, l
 	items := make([]models.FeedItem, 0, limit)
 	for rows.Next() {
 		var item models.FeedItem
-		if err := rows.Scan(&item.ID, &item.ActionType, &item.Metadata, &item.CreatedAt, &item.ActorLogin, &item.ActorAvatar, &item.DanceTitle); err != nil {
+		if err := rows.Scan(&item.ID, &item.ActionType, &item.Metadata, &item.CreatedAt, &item.ActorLogin, &item.ActorAvatar, &item.DanceTitle, &item.ActorID); err != nil {
 			logger.Error("failed to scan feed item: " + err.Error())
 			return nil, users.ErrorInternalServerError
 		}
