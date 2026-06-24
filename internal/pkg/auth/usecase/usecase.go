@@ -4,14 +4,13 @@ import (
 	"DDDance/internal/models"
 	"DDDance/internal/pkg/auth"
 	"DDDance/internal/pkg/utils/log"
+	"DDDance/internal/pkg/utils/password"
 	"context"
 	"crypto/rand"
-	"crypto/subtle"
 	"encoding/base32"
 	"fmt"
 	"log/slog"
 	"net/url"
-	"os"
 	"time"
 
 	"github.com/dgryski/dgoogauth"
@@ -19,25 +18,7 @@ import (
 	jwt "github.com/golang-jwt/jwt/v5"
 	uuid "github.com/satori/go.uuid"
 	"github.com/skip2/go-qrcode"
-	"golang.org/x/crypto/argon2"
 )
-
-func HashPass(plainPassword string) ([]byte, error) {
-	salt := make([]byte, 8)
-	if _, err := rand.Read(salt); err != nil {
-		return nil, err
-	}
-	hashedPass := argon2.IDKey([]byte(plainPassword), []byte(salt), 1, 64*1024, 4, 32)
-	return append(salt, hashedPass...), nil
-}
-
-func CheckPass(passHash []byte, plainPassword string) bool {
-	salt := make([]byte, 8)
-	copy(salt, passHash[:8])
-	userHash := argon2.IDKey([]byte(plainPassword), salt, 1, 64*1024, 4, 32)
-	userHashedPassword := append(salt, userHash...)
-	return subtle.ConstantTimeCompare(userHashedPassword, passHash) == 1
-}
 
 func randomSecret() (string, error) {
 	buf := make([]byte, 32)
@@ -52,10 +33,13 @@ type AuthUsecase struct {
 	authRepo auth.AuthRepo
 }
 
-func NewAuthUsecase(repo auth.AuthRepo) *AuthUsecase {
+// NewAuthUsecase wires the auth usecase. The JWT signing secret is passed in
+// (validated once at startup) rather than read from the environment here, so
+// every binary uses the same validated value.
+func NewAuthUsecase(repo auth.AuthRepo, secret string) *AuthUsecase {
 	return &AuthUsecase{
 		authRepo: repo,
-		secret:   os.Getenv("JWT_SECRET"),
+		secret:   secret,
 	}
 }
 
@@ -97,12 +81,22 @@ func (uc *AuthUsecase) SignInVKUser(ctx context.Context, vkid string) (models.Us
 func (uc *AuthUsecase) SignUpVKUser(ctx context.Context, vkid string, login string) (models.User, string, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
+	isRegistered, err := uc.authRepo.CheckUserExists(ctx, login)
+	if err != nil {
+		logger.Error("cannot check if login exists", slog.Any("error", err))
+		return models.User{}, "", auth.ErrorInternalServerError
+	}
+	if isRegistered {
+		logger.Warn("Such login already taken")
+		return models.User{}, "", auth.ErrorBadRequest
+	}
+
 	randomPass, err := randomSecret()
 	if err != nil {
 		logger.Error("cannot generate vk password")
 		return models.User{}, "", auth.ErrorInternalServerError
 	}
-	passwordHash, err := HashPass(randomPass)
+	passwordHash, err := password.Hash(randomPass)
 	if err != nil {
 		logger.Error("cannot hash password")
 		return models.User{}, "", auth.ErrorInternalServerError
@@ -110,12 +104,6 @@ func (uc *AuthUsecase) SignUpVKUser(ctx context.Context, vkid string, login stri
 
 	id := uuid.NewV4()
 	defaultAvatar := "avatars/default.png"
-
-	is_registred, _ := uc.authRepo.CheckUserExists(ctx, login)
-	if is_registred {
-		logger.Error("Such login already taken")
-		return models.User{}, "", auth.ErrorBadRequest
-	}
 
 	user := models.User{
 		ID:           id,
@@ -146,7 +134,7 @@ func (uc *AuthUsecase) SignUpUser(ctx context.Context, req models.SignUpInput) (
 
 	msg, dataIsValid := auth.Validation(req.Login, req.Password)
 	if !dataIsValid {
-		logger.Error(msg)
+		logger.Warn(msg)
 		return models.User{}, "", auth.ErrorBadRequest
 	}
 
@@ -155,11 +143,11 @@ func (uc *AuthUsecase) SignUpUser(ctx context.Context, req models.SignUpInput) (
 		return models.User{}, "", err
 	}
 	if exists {
-		logger.Error("user already exists")
+		logger.Warn("user already exists")
 		return models.User{}, "", auth.ErrorConflict
 	}
 
-	passwordHash, err := HashPass(req.Password)
+	passwordHash, err := password.Hash(req.Password)
 	if err != nil {
 		logger.Error("cannot hash password")
 		return models.User{}, "", auth.ErrorInternalServerError
@@ -202,7 +190,7 @@ func (uc *AuthUsecase) VerifyOTPCode(ctx context.Context, login, secretCode stri
 	}
 	isValid, err := otpConfig.Authenticate(userCode)
 	if err != nil || !isValid {
-		logger.Error("OTP authentication error")
+		logger.Warn("OTP authentication failed")
 		return auth.ErrorUnauthorized
 	}
 
@@ -219,12 +207,12 @@ func (uc *AuthUsecase) SignInUser(ctx context.Context, req models.SignInInput) (
 	}
 
 	if neededUser.IsForeign {
-		logger.Error("password login attempt on VK account")
+		logger.Warn("password login attempt on VK account")
 		return models.User{}, "", auth.ErrorBadRequest
 	}
 
-	if !CheckPass(neededUser.PasswordHash, req.Password) {
-		logger.Error("wrong password")
+	if !password.Check(neededUser.PasswordHash, req.Password) {
+		logger.Warn("wrong password")
 		return models.User{}, "", auth.ErrorBadRequest
 	}
 
@@ -235,10 +223,13 @@ func (uc *AuthUsecase) SignInUser(ctx context.Context, req models.SignInInput) (
 	}
 	if has2FA {
 		if req.Code == nil || *req.Code == "" {
-			logger.Error("2FA code required but not provided")
+			logger.Warn("2FA code required but not provided")
 			return models.User{}, "", auth.ErrorBadRequest
 		}
-		secretCode := uc.authRepo.GetUserSecretCode(ctx, neededUser.ID)
+		secretCode, secErr := uc.authRepo.GetUserSecretCode(ctx, neededUser.ID)
+		if secErr != nil {
+			return models.User{}, "", auth.ErrorInternalServerError
+		}
 		if err := uc.VerifyOTPCode(ctx, req.Login, secretCode, *req.Code); err != nil {
 			return models.User{}, "", err
 		}

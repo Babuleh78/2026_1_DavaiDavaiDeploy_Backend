@@ -5,6 +5,7 @@ import (
 	"DDDance/internal/pkg/helpers"
 	"DDDance/internal/pkg/users"
 	"DDDance/internal/pkg/utils/log"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
@@ -17,15 +18,20 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-func BotSecretMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		secret := os.Getenv("BOT_SECRET")
-		if secret == "" || r.Header.Get("X-Bot-Secret") != secret {
-			helpers.WriteError(w, http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+// BotSecretMiddleware guards the /bot router with a shared secret. The secret is
+// supplied at construction (read once from config) and compared in constant time
+// to avoid leaking it through response-timing differences.
+func BotSecretMiddleware(secret string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			provided := r.Header.Get("X-Bot-Secret")
+			if secret == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(secret)) != 1 {
+				helpers.WriteError(w, http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 type botLinkRequest struct {

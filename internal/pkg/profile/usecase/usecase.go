@@ -18,15 +18,15 @@ type ProfileUsecase struct {
 	tokenGenerator profile.TokenGenerator
 }
 
-func NewProfileUsecase(profileRepo profile.ProfileRepo, storageRepo profile.ProfileStorageRepo) *ProfileUsecase {
+// NewProfileUsecase wires the profile usecase. The token generator is a
+// required collaborator (used to re-issue tokens after a login change) and is
+// passed at construction.
+func NewProfileUsecase(profileRepo profile.ProfileRepo, storageRepo profile.ProfileStorageRepo, tokenGenerator profile.TokenGenerator) *ProfileUsecase {
 	return &ProfileUsecase{
-		profileRepo: profileRepo,
-		storageRepo: storageRepo,
+		profileRepo:    profileRepo,
+		storageRepo:    storageRepo,
+		tokenGenerator: tokenGenerator,
 	}
-}
-
-func (uc *ProfileUsecase) SetTokenGenerator(tg profile.TokenGenerator) {
-	uc.tokenGenerator = tg
 }
 
 func (uc *ProfileUsecase) UpdateProfile(ctx context.Context, id uuid.UUID, newLogin *string, avatarBuffer []byte, avatarContentType string) (models.User, string, error) {

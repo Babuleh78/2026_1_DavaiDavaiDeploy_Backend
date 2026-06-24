@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 	uuid "github.com/satori/go.uuid"
 
+	"DDDance/internal/pkg/config"
 	"DDDance/internal/pkg/kafka"
 )
 
@@ -288,20 +288,9 @@ func main() {
 }
 
 func initDB(ctx context.Context) (*pgxpool.Pool, error) {
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASS")
-	dbname := os.Getenv("DB_NAME")
-
-	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname,
-	)
-
-	config, err := pgxpool.ParseConfig(connStr)
+	poolCfg, err := pgxpool.ParseConfig(config.DSNFromEnv())
 	if err != nil {
 		return nil, err
 	}
-	return pgxpool.ConnectConfig(ctx, config)
+	return pgxpool.ConnectConfig(ctx, poolCfg)
 }

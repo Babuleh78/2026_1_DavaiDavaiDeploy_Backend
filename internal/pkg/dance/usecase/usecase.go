@@ -33,10 +33,21 @@ func mlServiceURL(path string) string {
 	return strings.TrimRight(os.Getenv("ML_SERVICE_URL"), "/") + "/ml/" + strings.TrimLeft(path, "/")
 }
 
-func NewDanceUsecase(danceRepo dance.DanceRepo, storageRepo dance.DanceStorageRepo) *DanceUsecase {
+// NewDanceUsecase wires the dance usecase. The achievement trigger and cache
+// invalidator are required collaborators and are passed at construction so the
+// usecase is never half-wired. Optional infrastructure (view cache, Kafka, ML
+// lock) is attached via Set* and degrades gracefully when absent.
+func NewDanceUsecase(
+	danceRepo dance.DanceRepo,
+	storageRepo dance.DanceStorageRepo,
+	achTrigger dance.AchievementTrigger,
+	cacheInvalidator dance.CacheInvalidator,
+) *DanceUsecase {
 	return &DanceUsecase{
-		danceRepo:   danceRepo,
-		storageRepo: storageRepo,
+		danceRepo:        danceRepo,
+		storageRepo:      storageRepo,
+		achTrigger:       achTrigger,
+		cacheInvalidator: cacheInvalidator,
 	}
 }
 
@@ -46,14 +57,6 @@ func (uc *DanceUsecase) SetViewCache(vc dance.ViewCache) {
 
 func (uc *DanceUsecase) SetKafkaProducer(kp dance.KafkaPublisher) {
 	uc.kafkaProducer = kp
-}
-
-func (uc *DanceUsecase) SetAchievementTrigger(at dance.AchievementTrigger) {
-	uc.achTrigger = at
-}
-
-func (uc *DanceUsecase) SetCacheInvalidator(ci dance.CacheInvalidator) {
-	uc.cacheInvalidator = ci
 }
 
 func (uc *DanceUsecase) SetMLLock(l dance.MLLock) {

@@ -14,7 +14,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -40,29 +39,22 @@ type UserHandler struct {
 	cookieSamesite http.SameSite
 }
 
-func NewUserHandler(client gen.AuthClient, uc users.UsersUsecase) *UserHandler {
-	secure := false
-	if os.Getenv("COOKIE_SECURE") == "true" {
-		secure = true
-	}
+// NewUserHandler wires the user handler. The comparison and dance usecases are
+// required collaborators and are passed at construction so handlers never face
+// a nil usecase.
+func NewUserHandler(client gen.AuthClient, uc users.UsersUsecase, compUC comparison.ComparisonUsecase, danceUC dance.DanceUsecase, cookieSecure bool, cookieSameSite string) *UserHandler {
 	samesite := http.SameSiteLaxMode
-	if os.Getenv("COOKIE_SAMESITE") == "Strict" {
+	if cookieSameSite == "Strict" {
 		samesite = http.SameSiteStrictMode
 	}
 	return &UserHandler{
 		client:         client,
 		uc:             uc,
-		cookieSecure:   secure,
+		compUC:         compUC,
+		danceUC:        danceUC,
+		cookieSecure:   cookieSecure,
 		cookieSamesite: samesite,
 	}
-}
-
-func (u *UserHandler) SetComparisonUsecase(uc comparison.ComparisonUsecase) {
-	u.compUC = uc
-}
-
-func (u *UserHandler) SetDanceUsecase(uc dance.DanceUsecase) {
-	u.danceUC = uc
 }
 
 func (u *UserHandler) JWTMiddleware(next http.Handler) http.Handler {
@@ -269,22 +261,28 @@ func (h *UserHandler) OptionalAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func AdminTokenMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		adminToken := os.Getenv("ADMIN_TOKEN")
-		if adminToken == "" {
-			helpers.WriteError(w, http.StatusServiceUnavailable)
-			return
-		}
-		authHeader := r.Header.Get("Authorization")
-		if !strings.HasPrefix(authHeader, "Bearer ") {
-			helpers.WriteError(w, http.StatusUnauthorized)
-			return
-		}
-		if strings.TrimPrefix(authHeader, "Bearer ") != adminToken {
-			helpers.WriteError(w, http.StatusUnauthorized)
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
+// AdminTokenMiddleware guards the /admin router with a bearer token. The token
+// is supplied at construction (read once from config) and compared in constant
+// time so the comparison does not leak the token via response timing.
+func AdminTokenMiddleware(adminToken string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if adminToken == "" {
+				helpers.WriteError(w, http.StatusServiceUnavailable)
+				return
+			}
+			authHeader := r.Header.Get("Authorization")
+			const prefix = "Bearer "
+			if !strings.HasPrefix(authHeader, prefix) {
+				helpers.WriteError(w, http.StatusUnauthorized)
+				return
+			}
+			provided := strings.TrimPrefix(authHeader, prefix)
+			if subtle.ConstantTimeCompare([]byte(provided), []byte(adminToken)) != 1 {
+				helpers.WriteError(w, http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
 }

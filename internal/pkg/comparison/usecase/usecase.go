@@ -44,23 +44,25 @@ type ComparisonUsecase struct {
 	ssePublisher  comparison.SSEPublisher
 }
 
-func NewComparisonUsecase(compRepo comparison.ComparisonRepo, storageRepo comparison.ComparisonStorageRepo) *ComparisonUsecase {
+// NewComparisonUsecase wires the comparison usecase. The achievement trigger,
+// duel submitter and upload finalizer are required collaborators and are passed
+// here so a fully-constructed usecase is guaranteed to have them (no post-hoc
+// setters, no nil-collaborator panics). Optional infrastructure (Redis caches,
+// Kafka, SSE) is still attached via Set* and degrades gracefully when absent.
+func NewComparisonUsecase(
+	compRepo comparison.ComparisonRepo,
+	storageRepo comparison.ComparisonStorageRepo,
+	achTrigger comparison.AchievementTrigger,
+	duelSub comparison.DuelSubmitter,
+	uploadFin comparison.UploadFinalizer,
+) *ComparisonUsecase {
 	return &ComparisonUsecase{
 		compRepo:    compRepo,
 		storageRepo: storageRepo,
+		achTrigger:  achTrigger,
+		duelSub:     duelSub,
+		uploadFin:   uploadFin,
 	}
-}
-
-func (uc *ComparisonUsecase) SetAchievementTrigger(at comparison.AchievementTrigger) {
-	uc.achTrigger = at
-}
-
-func (uc *ComparisonUsecase) SetDuelSubmitter(ds comparison.DuelSubmitter) {
-	uc.duelSub = ds
-}
-
-func (uc *ComparisonUsecase) SetUploadFinalizer(f comparison.UploadFinalizer) {
-	uc.uploadFin = f
 }
 
 func (uc *ComparisonUsecase) SetKafkaProducer(kp comparison.KafkaPublisher) {
@@ -185,6 +187,51 @@ func isS3NotFoundError(err error) bool {
 	return strings.Contains(msg, "NoSuchKey") || strings.Contains(msg, "StatusCode: 404")
 }
 
+// loadAuthoritativeResult fetches the ML-produced comparison_result.json for an
+// attempt from S3, returning nil when it cannot be read or parsed. It is the
+// source of truth for an attempt's score (see SaveAttempt). The candidate keys
+// mirror the path resolution in GetCompareResult: owner-based first, then the
+// anonymous layout (attempt_id/attempt_id) used before an anon→register move.
+func (uc *ComparisonUsecase) loadAuthoritativeResult(ctx context.Context, userID uuid.UUID, attemptID string) *models.CompareStatusResult {
+	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
+	candidates := []string{
+		fmt.Sprintf("users/%s/%s/comparison_result.json", userID.String(), attemptID),
+		fmt.Sprintf("users/%s/%s/comparison_result.json", attemptID, attemptID),
+	}
+	for _, key := range candidates {
+		data, err := uc.storageRepo.DownloadFile(ctx, key)
+		if err != nil {
+			if !isS3NotFoundError(err) {
+				logger.Warn("failed to download comparison_result.json for score verification", "error", err, "key", key)
+			}
+			continue
+		}
+		var stored models.CompareStatusResult
+		if err := json.Unmarshal(data, &stored); err != nil {
+			logger.Warn("failed to unmarshal comparison_result.json for score verification", "error", err, "key", key)
+			return nil
+		}
+		return &stored
+	}
+	return nil
+}
+
+// meanSegmentScores returns the mean timing / amplitude / pose-accuracy across
+// segments. ok is false when there are no segments to average, so the caller
+// keeps whatever values it already had.
+func meanSegmentScores(segments []models.SegmentDiagnostic) (timing, amplitude, pose float64, ok bool) {
+	if len(segments) == 0 {
+		return 0, 0, 0, false
+	}
+	for _, s := range segments {
+		timing += s.TimingScore
+		amplitude += s.AmplitudeScore
+		pose += s.PoseAccuracyScore
+	}
+	n := float64(len(segments))
+	return timing / n, amplitude / n, pose / n, true
+}
+
 func (uc *ComparisonUsecase) SaveAttempt(ctx context.Context, userID uuid.UUID, attemptID, danceID string, includeVideo bool, fallbackScore *float64, userName string, isPrivate bool, duelID *uuid.UUID, publicConsent bool, submitToDuels bool, timingScore, amplitudeScore, poseScore float64) error {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 	if attemptID == "" || danceID == "" {
@@ -197,16 +244,39 @@ func (uc *ComparisonUsecase) SaveAttempt(ctx context.Context, userID uuid.UUID, 
 		prevBest = prevRank.Score
 	}
 
-	var score float64
-	if fallbackScore != nil {
+	// SECURITY: the score persisted to the DB and pushed to the global/per-dance
+	// leaderboard MUST be the ML-produced value, never the number in the client
+	// request body. The authoritative comparison_result.json (written by the ML
+	// service) is read from S3 here. The request-supplied scores are accepted
+	// only as a fallback when that artifact cannot be read — legacy attempts or
+	// the anonymous→register handoff before the S3 objects are moved. Without
+	// this, any client could POST an arbitrary score and top the leaderboard.
+	var (
+		score        float64
+		haveNewScore bool
+	)
+	if result := uc.loadAuthoritativeResult(ctx, userID, attemptID); result != nil {
+		score = result.ComparisonScore
+		haveNewScore = true
+		if t, a, p, ok := meanSegmentScores(result.Segments); ok {
+			timingScore, amplitudeScore, poseScore = t, a, p
+		}
+		if fallbackScore != nil && *fallbackScore != score {
+			logger.Warn("client-reported score differs from ML result; using ML result",
+				"attempt_id", attemptID, "client_score", *fallbackScore, "ml_score", score)
+		}
+	} else if fallbackScore != nil {
 		score = *fallbackScore
+		haveNewScore = true
+		logger.Warn("authoritative comparison result unavailable; using client-reported score",
+			"attempt_id", attemptID)
 	} else if prevRank != nil {
 		score = prevRank.Score
 	}
 
-	if fallbackScore != nil {
-		if recErr := uc.compRepo.RecordDanceAttempt(ctx, danceID, &userID, attemptID, *fallbackScore); recErr != nil {
-			logger.Warn("failed to record fallback attempt (may already exist)", "error", recErr)
+	if haveNewScore {
+		if recErr := uc.compRepo.RecordDanceAttempt(ctx, danceID, &userID, attemptID, score); recErr != nil {
+			logger.Warn("failed to record attempt (may already exist)", "error", recErr)
 		}
 	}
 

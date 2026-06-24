@@ -50,7 +50,11 @@ func (h *ComparisonHandler) SaveAttempt(w http.ResponseWriter, r *http.Request) 
 
 	var input models.SaveAttemptInput
 	if r.Body != nil && r.ContentLength != 0 {
-		_ = json.NewDecoder(r.Body).Decode(&input)
+		if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+			logger.Warn("failed to decode SaveAttempt body", slog.Any("error", err))
+			helpers.WriteError(w, http.StatusBadRequest)
+			return
+		}
 	}
 	if input.DanceID == "" {
 		helpers.WriteError(w, http.StatusBadRequest)

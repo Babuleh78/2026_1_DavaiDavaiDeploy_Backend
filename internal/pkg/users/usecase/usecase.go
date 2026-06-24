@@ -4,35 +4,15 @@ import (
 	"DDDance/internal/models"
 	"DDDance/internal/pkg/users"
 	"DDDance/internal/pkg/utils/log"
+	"DDDance/internal/pkg/utils/password"
 	"context"
-	"crypto/rand"
-	"crypto/subtle"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	jwt "github.com/golang-jwt/jwt/v5"
 	uuid "github.com/satori/go.uuid"
-	"golang.org/x/crypto/argon2"
 )
-
-func HashPass(plainPassword string) ([]byte, error) {
-	salt := make([]byte, 8)
-	if _, err := rand.Read(salt); err != nil {
-		return nil, err
-	}
-	hashedPass := argon2.IDKey([]byte(plainPassword), []byte(salt), 1, 64*1024, 4, 32)
-	return append(salt, hashedPass...), nil
-}
-
-func CheckPass(passHash []byte, plainPassword string) bool {
-	salt := make([]byte, 8)
-	copy(salt, passHash[:8])
-	userHash := argon2.IDKey([]byte(plainPassword), salt, 1, 64*1024, 4, 32)
-	userHashedPassword := append(salt, userHash...)
-	return subtle.ConstantTimeCompare(userHashedPassword, passHash) == 1
-}
 
 type UserUsecase struct {
 	secret        string
@@ -44,14 +24,12 @@ type UserUsecase struct {
 	ssePublisher  users.SSEPublisher
 }
 
-func NewUserUsecase(userRepo users.UsersRepo, storageRepo users.StorageRepo) *UserUsecase {
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if len(jwtSecret) < 32 {
-		fmt.Fprintf(os.Stderr, "FATAL: JWT_SECRET must be at least 32 characters, got %d\n", len(jwtSecret))
-		os.Exit(1)
-	}
+// NewUserUsecase wires the user usecase. The JWT signing secret is passed in
+// (validated once at startup via config.ValidateJWTSecret) rather than read and
+// validated here, so every binary shares one consistent rule.
+func NewUserUsecase(userRepo users.UsersRepo, storageRepo users.StorageRepo, secret string) *UserUsecase {
 	return &UserUsecase{
-		secret:      jwtSecret,
+		secret:      secret,
 		userRepo:    userRepo,
 		storageRepo: storageRepo,
 	}
@@ -157,7 +135,7 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, id uuid.UUID, oldPass
 		return models.User{}, "", err
 	}
 
-	if !CheckPass(neededUser.PasswordHash, oldPassword) {
+	if !password.Check(neededUser.PasswordHash, oldPassword) {
 		logger.Error("wrong old password")
 		return models.User{}, "", users.ErrorBadRequest
 	}
@@ -175,7 +153,7 @@ func (uc *UserUsecase) ChangePassword(ctx context.Context, id uuid.UUID, oldPass
 
 	neededUser.Version += 1
 
-	passwordHash, err := HashPass(newPassword)
+	passwordHash, err := password.Hash(newPassword)
 	if err != nil {
 		logger.Error("cannot hash password")
 		return models.User{}, "", users.ErrorInternalServerError

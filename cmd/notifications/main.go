@@ -1,6 +1,7 @@
 package main
 
 import (
+	"DDDance/internal/pkg/config"
 	"DDDance/internal/pkg/kafka"
 	notificationsGRPC "DDDance/internal/pkg/notifications/delivery/grpc"
 	"DDDance/internal/pkg/notifications/delivery/grpc/gen"
@@ -9,7 +10,6 @@ import (
 	notificationsUsecase "DDDance/internal/pkg/notifications/usecase"
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"log/slog"
 	"net"
@@ -36,18 +36,7 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASS")
-	dbname := os.Getenv("DB_NAME")
-
-	postgresString := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname,
-	)
-
-	dbpool, err := pgxpool.Connect(ctx, postgresString)
+	dbpool, err := pgxpool.Connect(ctx, config.DSNFromEnv())
 	if err != nil {
 		log.Fatalf("notifications: unable to connect to database: %v", err)
 	}

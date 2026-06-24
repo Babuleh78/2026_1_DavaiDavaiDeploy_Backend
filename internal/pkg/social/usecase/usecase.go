@@ -20,12 +20,11 @@ type SocialUsecase struct {
 	kafkaProducer social.KafkaPublisher
 }
 
-func NewSocialUsecase(socialRepo social.SocialRepo) *SocialUsecase {
-	return &SocialUsecase{socialRepo: socialRepo}
-}
-
-func (uc *SocialUsecase) SetAchievementTrigger(at social.AchievementTrigger) {
-	uc.achTrigger = at
+// NewSocialUsecase wires the social usecase. The achievement trigger is a
+// required collaborator and is passed at construction. Kafka is optional and
+// attached via Set*.
+func NewSocialUsecase(socialRepo social.SocialRepo, achTrigger social.AchievementTrigger) *SocialUsecase {
+	return &SocialUsecase{socialRepo: socialRepo, achTrigger: achTrigger}
 }
 
 func (uc *SocialUsecase) SetKafkaProducer(kp social.KafkaPublisher) {

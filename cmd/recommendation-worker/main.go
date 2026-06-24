@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -17,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 	uuid "github.com/satori/go.uuid"
 
+	"DDDance/internal/pkg/config"
 	recommendClient "DDDance/internal/pkg/recommendation/client"
 	recommendUsecase "DDDance/internal/pkg/recommendation/usecase"
 	userRepo "DDDance/internal/pkg/users/repo/pg"
@@ -97,14 +97,9 @@ func main() {
 }
 
 func initDB(ctx context.Context) (*pgxpool.Pool, error) {
-	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		os.Getenv("DB_HOST"), os.Getenv("DB_PORT"),
-		os.Getenv("DB_USER"), os.Getenv("DB_PASS"), os.Getenv("DB_NAME"),
-	)
-	config, err := pgxpool.ParseConfig(connStr)
+	poolCfg, err := pgxpool.ParseConfig(config.DSNFromEnv())
 	if err != nil {
 		return nil, err
 	}
-	return pgxpool.ConnectConfig(ctx, config)
+	return pgxpool.ConnectConfig(ctx, poolCfg)
 }

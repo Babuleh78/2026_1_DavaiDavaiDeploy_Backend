@@ -151,22 +151,24 @@ func (r *AuthRepository) CheckUserTwoFactor(ctx context.Context, userID uuid.UUI
 	return has2FA, nil
 }
 
-func (r *AuthRepository) GetUserSecretCode(ctx context.Context, userID uuid.UUID) string {
+func (r *AuthRepository) GetUserSecretCode(ctx context.Context, userID uuid.UUID) (string, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 	var secretCode string
 	err := appmetrics.ObserveDBQuery("auth_get_user_secret_code", func() error {
 		return r.db.QueryRow(ctx, CheckUserSecretCodeQuery, userID).Scan(&secretCode)
 	})
 	if err != nil {
+		// 2FA was reported enabled by CheckUserTwoFactor, so a missing secret row
+		// is an inconsistent state, not a normal "no 2FA" case — surface it as an
+		// error instead of returning "" (which would silently fail OTP checks).
 		if errors.Is(err, pgx.ErrNoRows) {
-			logger.Error("user not exists")
+			logger.Error("2FA secret row missing for user with 2FA enabled", slog.String("user_id", userID.String()))
 		} else {
-			logger.Error("failed to check 2FA status: " + err.Error())
+			logger.Error("failed to read 2FA secret", slog.Any("error", err))
 		}
-		return ""
+		return "", auth.ErrorInternalServerError
 	}
-	logger.Info("successfully checked 2FA status")
-	return secretCode
+	return secretCode, nil
 }
 
 func (r *AuthRepository) GetVKUser(ctx context.Context, vkid string) (models.User, error) {

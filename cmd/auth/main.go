@@ -30,6 +30,7 @@ import (
 	authHandler "DDDance/internal/pkg/auth/delivery/grpc"
 	authRepo "DDDance/internal/pkg/auth/repo"
 	authUsecase "DDDance/internal/pkg/auth/usecase"
+	appconfig "DDDance/internal/pkg/config"
 	"DDDance/internal/pkg/middleware/logger"
 	userRepo "DDDance/internal/pkg/users/repo/pg"
 	storageRepo "DDDance/internal/pkg/users/repo/s3"
@@ -39,23 +40,12 @@ import (
 )
 
 func initDB(ctx context.Context) (*pgxpool.Pool, error) {
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASS")
-	dbname := os.Getenv("DB_NAME")
-
-	postgresString := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname,
-	)
-
-	config, err := pgxpool.ParseConfig(postgresString)
+	poolCfg, err := pgxpool.ParseConfig(appconfig.DSNFromEnv())
 	if err != nil {
 		return nil, err
 	}
 
-	pool, err := pgxpool.ConnectConfig(ctx, config)
+	pool, err := pgxpool.ConnectConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, err
 	}
@@ -110,8 +100,9 @@ func main() {
 	_ = godotenv.Load()
 	ctx := context.Background()
 
-	if os.Getenv("JWT_SECRET") == "" {
-		log.Fatal("JWT_SECRET is not set")
+	jwtSecret, err := appconfig.MustJWTSecret()
+	if err != nil {
+		log.Fatalf("auth: %v", err)
 	}
 
 	dbpool, err := initDB(ctx)
@@ -126,10 +117,10 @@ func main() {
 	}
 
 	authRepo := authRepo.NewAuthRepository(dbpool)
-	authUsecase := authUsecase.NewAuthUsecase(authRepo)
+	authUsecase := authUsecase.NewAuthUsecase(authRepo, jwtSecret)
 	userRepo := userRepo.NewUserRepository(dbpool)
 	s3Repo := storageRepo.NewS3Repository(s3Client, s3Bucket)
-	userUsecase := userUsecase.NewUserUsecase(userRepo, s3Repo)
+	userUsecase := userUsecase.NewUserUsecase(userRepo, s3Repo, jwtSecret)
 
 	authHandler := authHandler.NewGrpcAuthHandler(authUsecase, userUsecase)
 

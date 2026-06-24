@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"log"
 	"log/slog"
 	"os"
@@ -16,6 +15,7 @@ import (
 	"github.com/joho/godotenv"
 	uuid "github.com/satori/go.uuid"
 
+	"DDDance/internal/pkg/config"
 	"DDDance/internal/pkg/kafka"
 	userRepo "DDDance/internal/pkg/users/repo/pg"
 	redisRepo "DDDance/internal/pkg/users/repo/redis"
@@ -31,6 +31,11 @@ func main() {
 	}
 	brokers := strings.Split(kafkaBrokers, ",")
 
+	jwtSecret, err := config.MustJWTSecret()
+	if err != nil {
+		log.Fatalf("achievements-worker: %v", err)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -41,7 +46,7 @@ func main() {
 	defer dbpool.Close()
 
 	pgRepo := userRepo.NewUserRepository(dbpool)
-	uc := userUsecase.NewUserUsecase(pgRepo, nil)
+	uc := userUsecase.NewUserUsecase(pgRepo, nil, jwtSecret)
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	consumer := kafka.NewKafkaConsumer(brokers, logger)
@@ -194,20 +199,9 @@ func main() {
 }
 
 func initDB(ctx context.Context) (*pgxpool.Pool, error) {
-	host := os.Getenv("DB_HOST")
-	port := os.Getenv("DB_PORT")
-	user := os.Getenv("DB_USER")
-	password := os.Getenv("DB_PASS")
-	dbname := os.Getenv("DB_NAME")
-
-	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, password, dbname,
-	)
-
-	config, err := pgxpool.ParseConfig(connStr)
+	poolCfg, err := pgxpool.ParseConfig(config.DSNFromEnv())
 	if err != nil {
 		return nil, err
 	}
-	return pgxpool.ConnectConfig(ctx, config)
+	return pgxpool.ConnectConfig(ctx, poolCfg)
 }

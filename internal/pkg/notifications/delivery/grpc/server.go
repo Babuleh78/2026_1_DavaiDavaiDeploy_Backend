@@ -36,7 +36,9 @@ func (s *NotificationsGRPCServer) Send(ctx context.Context, req *gen.Notificatio
 
 	var payload map[string]any
 	if req.GetPayload() != "" {
-		_ = json.Unmarshal([]byte(req.GetPayload()), &payload)
+		if err := json.Unmarshal([]byte(req.GetPayload()), &payload); err != nil {
+			slog.Warn("notifications gRPC Send: invalid payload JSON", "type", req.GetType(), "error", err)
+		}
 	}
 	if payload == nil {
 		payload = map[string]any{}
