@@ -30,7 +30,7 @@ func (r *AuthRepository) CheckUserExists(ctx context.Context, login string) (boo
 		return r.db.QueryRow(ctx, CheckUserExistsQuery, login).Scan(&exists)
 	})
 	if err != nil {
-		logger.Error("failed to scan user: " + err.Error())
+		logger.Error("failed to scan user", "error", err)
 		return false, auth.ErrorInternalServerError
 	}
 	logger.Info("succesfully checked user")
@@ -70,7 +70,7 @@ func (r *AuthRepository) CheckUserLogin(ctx context.Context, login string) (mode
 			logger.Error("user not exists")
 			return models.User{}, auth.ErrorBadRequest
 		}
-		logger.Error("failed to scan user: " + err.Error())
+		logger.Error("failed to scan user", "error", err)
 		return models.User{}, auth.ErrorInternalServerError
 	}
 	logger.Info("succesfully got user by login from db")
@@ -84,7 +84,7 @@ func (r *AuthRepository) IncrementUserVersion(ctx context.Context, userID uuid.U
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to increment version: " + err.Error())
+		logger.Error("failed to increment version", "error", err)
 		return auth.ErrorInternalServerError
 	}
 	logger.Info("succesfully incremented version of personal data")
@@ -105,7 +105,7 @@ func (r *AuthRepository) GetUserByLogin(ctx context.Context, login string) (mode
 			logger.Error("user not exists")
 			return models.User{}, auth.ErrorBadRequest
 		}
-		logger.Error("failed to scan user: " + err.Error())
+		logger.Error("failed to scan user", "error", err)
 		return models.User{}, auth.ErrorInternalServerError
 	}
 	logger.Info("succesfully got user by login from db")
@@ -126,7 +126,7 @@ func (r *AuthRepository) GetUserByID(ctx context.Context, id uuid.UUID) (models.
 			logger.Error("user not exists")
 			return models.User{}, auth.ErrorBadRequest
 		}
-		logger.Error("failed to scan user: " + err.Error())
+		logger.Error("failed to scan user", "error", err)
 		return models.User{}, auth.ErrorInternalServerError
 	}
 	logger.Info("succesfully got user by id from db")
@@ -144,7 +144,7 @@ func (r *AuthRepository) CheckUserTwoFactor(ctx context.Context, userID uuid.UUI
 			logger.Error("user not exists")
 			return false, auth.ErrorBadRequest
 		}
-		logger.Error("failed to check 2FA status: " + err.Error())
+		logger.Error("failed to check 2FA status", "error", err)
 		return false, auth.ErrorInternalServerError
 	}
 	logger.Info("successfully checked 2FA status")
@@ -158,9 +158,6 @@ func (r *AuthRepository) GetUserSecretCode(ctx context.Context, userID uuid.UUID
 		return r.db.QueryRow(ctx, CheckUserSecretCodeQuery, userID).Scan(&secretCode)
 	})
 	if err != nil {
-		// 2FA was reported enabled by CheckUserTwoFactor, so a missing secret row
-		// is an inconsistent state, not a normal "no 2FA" case — surface it as an
-		// error instead of returning "" (which would silently fail OTP checks).
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.Error("2FA secret row missing for user with 2FA enabled", slog.String("user_id", userID.String()))
 		} else {
@@ -185,7 +182,7 @@ func (r *AuthRepository) GetVKUser(ctx context.Context, vkid string) (models.Use
 			logger.Error("vk user not exists")
 			return models.User{}, auth.ErrorBadRequest
 		}
-		logger.Error("failed to scan vk user: " + err.Error())
+		logger.Error("failed to scan vk user", "error", err)
 		return models.User{}, auth.ErrorInternalServerError
 	}
 	logger.Info("succesfully got vk user by id from db")
@@ -199,7 +196,7 @@ func (r *AuthRepository) CreateVKUser(ctx context.Context, user models.User, vki
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to create vk user: " + err.Error())
+		logger.Error("failed to create vk user", "error", err)
 		return auth.ErrorInternalServerError
 	}
 	logger.Info("succesfully created vk user")

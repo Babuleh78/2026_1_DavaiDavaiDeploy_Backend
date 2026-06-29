@@ -7,9 +7,6 @@ import (
 )
 
 func WriteJSON(w http.ResponseWriter, data interface{}) {
-	// Marshal before touching the response: if encoding fails we can still send
-	// a clean 500. Encoding straight to w would have already written a 200 and
-	// part of the body, making the later WriteHeader(500) a no-op.
 	body, err := json.Marshal(data)
 	if err != nil {
 		WriteError(w, http.StatusInternalServerError)

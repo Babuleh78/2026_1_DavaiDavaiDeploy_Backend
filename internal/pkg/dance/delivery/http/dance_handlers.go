@@ -31,24 +31,22 @@ const (
 )
 
 type DanceHandler struct {
-	uc             dance.DanceUsecase
-	cookieSecure   bool
-	cookieSamesite http.SameSite
+	uc              dance.DanceUsecase
+	cookieSecure    bool
+	cookieSamesite  http.SameSite
+	mlInternalToken string
 }
 
-func NewDanceHandler(uc dance.DanceUsecase) *DanceHandler {
-	secure := false
-	if os.Getenv("COOKIE_SECURE") == "true" {
-		secure = true
-	}
+func NewDanceHandler(uc dance.DanceUsecase, cookieSecure bool, cookieSameSite, mlInternalToken string) *DanceHandler {
 	samesite := http.SameSiteLaxMode
-	if os.Getenv("COOKIE_SAMESITE") == "Strict" {
+	if cookieSameSite == "Strict" {
 		samesite = http.SameSiteStrictMode
 	}
 	return &DanceHandler{
-		uc:             uc,
-		cookieSecure:   secure,
-		cookieSamesite: samesite,
+		uc:              uc,
+		cookieSecure:    cookieSecure,
+		cookieSamesite:  samesite,
+		mlInternalToken: mlInternalToken,
 	}
 }
 
@@ -266,7 +264,9 @@ func (d *DanceHandler) LoadDance(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user := getUserFromContext(r.Context()); user != nil {
-		_ = d.uc.AddToHistory(r.Context(), user.ID, danceResult.DanceID, "")
+		if histErr := d.uc.AddToHistory(r.Context(), user.ID, danceResult.DanceID, ""); histErr != nil {
+			logger.Warn("failed to add dance to history", "error", histErr)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -316,7 +316,9 @@ func (d *DanceHandler) LoadDanceByURL(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if user := getUserFromContext(r.Context()); user != nil {
-		_ = d.uc.AddToHistory(r.Context(), user.ID, danceResult.DanceID, req.URL)
+		if histErr := d.uc.AddToHistory(r.Context(), user.ID, danceResult.DanceID, req.URL); histErr != nil {
+			logger.Warn("failed to add dance to history", "error", histErr)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -410,7 +412,9 @@ func (d *DanceHandler) TrimAndLoadDance(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if user := getUserFromContext(r.Context()); user != nil {
-		_ = d.uc.AddToHistory(r.Context(), user.ID, danceResult.DanceID, "")
+		if histErr := d.uc.AddToHistory(r.Context(), user.ID, danceResult.DanceID, ""); histErr != nil {
+			logger.Warn("failed to add dance to history", "error", histErr)
+		}
 	}
 
 	response := models.LoadDanceResponse{
@@ -1011,7 +1015,7 @@ func (d *DanceHandler) UpdateSegmentDescription(w http.ResponseWriter, r *http.R
 func (d *DanceHandler) PatchDanceDuration(w http.ResponseWriter, r *http.Request) {
 	logger := log.GetLoggerFromContext(r.Context()).With(slog.String("func", log.GetFuncName()))
 
-	expected := os.Getenv("ML_INTERNAL_TOKEN")
+	expected := d.mlInternalToken
 	if got := r.Header.Get("X-Internal-Token"); expected == "" || subtle.ConstantTimeCompare([]byte(got), []byte(expected)) != 1 {
 		helpers.WriteError(w, http.StatusUnauthorized)
 		return

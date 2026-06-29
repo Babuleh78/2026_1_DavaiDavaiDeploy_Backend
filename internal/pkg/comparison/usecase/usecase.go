@@ -17,6 +17,7 @@ import (
 	"time"
 
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/sync/singleflight"
 )
 
 const topDancersCacheTTL = 10 * time.Minute
@@ -25,9 +26,8 @@ type topDancersCache struct {
 	mu        sync.Mutex
 	entries   []models.TopDancerEntry
 	updatedAt time.Time
+	group     singleflight.Group
 }
-
-var topDancersCacheInstance topDancersCache
 
 const mlInternalTokenHeader = "X-Internal-Token"
 
@@ -42,13 +42,11 @@ type ComparisonUsecase struct {
 	botNotifier   comparison.BotNotifier
 	leaderboard   comparison.Leaderboard
 	ssePublisher  comparison.SSEPublisher
+
+	mlInternalToken string
+	topDancers      topDancersCache
 }
 
-// NewComparisonUsecase wires the comparison usecase. The achievement trigger,
-// duel submitter and upload finalizer are required collaborators and are passed
-// here so a fully-constructed usecase is guaranteed to have them (no post-hoc
-// setters, no nil-collaborator panics). Optional infrastructure (Redis caches,
-// Kafka, SSE) is still attached via Set* and degrades gracefully when absent.
 func NewComparisonUsecase(
 	compRepo comparison.ComparisonRepo,
 	storageRepo comparison.ComparisonStorageRepo,
@@ -85,29 +83,33 @@ func (uc *ComparisonUsecase) SetSSEPublisher(sp comparison.SSEPublisher) {
 	uc.ssePublisher = sp
 }
 
+func (uc *ComparisonUsecase) SetMLInternalToken(token string) {
+	uc.mlInternalToken = token
+}
+
 func mlServiceURL(path string) string {
 	return strings.TrimRight(os.Getenv("ML_SERVICE_URL"), "/") + "/ml/" + strings.TrimLeft(path, "/")
 }
 
-func mlPost(ctx context.Context, client *http.Client, url string, jsonBody []byte) (*http.Response, error) {
+func (uc *ComparisonUsecase) mlPost(ctx context.Context, client *http.Client, url string, jsonBody []byte) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if token := os.Getenv("ML_INTERNAL_TOKEN"); token != "" {
-		req.Header.Set(mlInternalTokenHeader, token)
+	if uc.mlInternalToken != "" {
+		req.Header.Set(mlInternalTokenHeader, uc.mlInternalToken)
 	}
 	return client.Do(req)
 }
 
-func mlGet(ctx context.Context, client *http.Client, url string) (*http.Response, error) {
+func (uc *ComparisonUsecase) mlGet(ctx context.Context, client *http.Client, url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	if token := os.Getenv("ML_INTERNAL_TOKEN"); token != "" {
-		req.Header.Set(mlInternalTokenHeader, token)
+	if uc.mlInternalToken != "" {
+		req.Header.Set(mlInternalTokenHeader, uc.mlInternalToken)
 	}
 	return client.Do(req)
 }
@@ -135,15 +137,18 @@ func (uc *ComparisonUsecase) maybeNotifyTop10(ctx context.Context, userID uuid.U
 			return
 		}
 		cacheKey := fmt.Sprintf("top10_notified:%s", userID.String())
-		fired, _ := uc.top10Cache.SetNX(detached, cacheKey, 24*time.Hour)
-		if !fired {
+		fired, err := uc.top10Cache.SetNX(detached, cacheKey, 24*time.Hour)
+		if err != nil || !fired {
 			return
 		}
-		payload, _ := json.Marshal(map[string]interface{}{
+		payload, err := json.Marshal(map[string]interface{}{
 			"to_user_id":       userID.String(),
 			"type":             "top_entry",
 			"telegram_payload": map[string]interface{}{},
 		})
+		if err != nil {
+			return
+		}
 		uc.kafkaProducer.PublishAsync(detached, kafka.TopicNotificationSend, userID.String(), payload, func(pubErr error) {
 			logger.Warn("kafka publish top_entry notification failed", "user_id", userID, "error", pubErr)
 		})
@@ -160,11 +165,11 @@ func (uc *ComparisonUsecase) maybeNotifyAttemptResult(ctx context.Context, userI
 		if err != nil || tid == nil {
 			return
 		}
-		title, _ := uc.compRepo.GetDanceTitleByID(detached, danceID)
-		if title == "" {
+		title, err := uc.compRepo.GetDanceTitleByID(detached, danceID)
+		if err != nil || title == "" {
 			title = danceID
 		}
-		msg, _ := json.Marshal(map[string]interface{}{
+		msg, err := json.Marshal(map[string]interface{}{
 			"telegram_id": *tid,
 			"type":        "attempt_result",
 			"payload": map[string]interface{}{
@@ -173,6 +178,9 @@ func (uc *ComparisonUsecase) maybeNotifyAttemptResult(ctx context.Context, userI
 				"attempt_id":  attemptID,
 			},
 		})
+		if err != nil {
+			return
+		}
 		if pushErr := uc.botNotifier.Push(detached, msg); pushErr != nil {
 			logger.Warn("failed to push attempt_result bot notification", "user_id", userID, "error", pushErr)
 		}
@@ -187,11 +195,6 @@ func isS3NotFoundError(err error) bool {
 	return strings.Contains(msg, "NoSuchKey") || strings.Contains(msg, "StatusCode: 404")
 }
 
-// loadAuthoritativeResult fetches the ML-produced comparison_result.json for an
-// attempt from S3, returning nil when it cannot be read or parsed. It is the
-// source of truth for an attempt's score (see SaveAttempt). The candidate keys
-// mirror the path resolution in GetCompareResult: owner-based first, then the
-// anonymous layout (attempt_id/attempt_id) used before an anon→register move.
 func (uc *ComparisonUsecase) loadAuthoritativeResult(ctx context.Context, userID uuid.UUID, attemptID string) *models.CompareStatusResult {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 	candidates := []string{
@@ -216,9 +219,6 @@ func (uc *ComparisonUsecase) loadAuthoritativeResult(ctx context.Context, userID
 	return nil
 }
 
-// meanSegmentScores returns the mean timing / amplitude / pose-accuracy across
-// segments. ok is false when there are no segments to average, so the caller
-// keeps whatever values it already had.
 func meanSegmentScores(segments []models.SegmentDiagnostic) (timing, amplitude, pose float64, ok bool) {
 	if len(segments) == 0 {
 		return 0, 0, 0, false
@@ -238,19 +238,16 @@ func (uc *ComparisonUsecase) SaveAttempt(ctx context.Context, userID uuid.UUID, 
 		return comparison.ErrorBadRequest
 	}
 
-	prevRank, _ := uc.compRepo.GetUserDanceRank(ctx, danceID, userID)
+	prevRank, rankErr := uc.compRepo.GetUserDanceRank(ctx, danceID, userID)
+	if rankErr != nil {
+		logger.Warn("failed to get previous dance rank", "error", rankErr)
+	}
 	prevBest := 0.0
 	if prevRank != nil {
 		prevBest = prevRank.Score
 	}
 
-	// SECURITY: the score persisted to the DB and pushed to the global/per-dance
-	// leaderboard MUST be the ML-produced value, never the number in the client
-	// request body. The authoritative comparison_result.json (written by the ML
-	// service) is read from S3 here. The request-supplied scores are accepted
-	// only as a fallback when that artifact cannot be read — legacy attempts or
-	// the anonymous→register handoff before the S3 objects are moved. Without
-	// this, any client could POST an arbitrary score and top the leaderboard.
+	// счёт берём только из ML-результата в S3, клиентскому значению не доверяем (fallback — если артефакта нет)
 	var (
 		score        float64
 		haveNewScore bool
@@ -280,7 +277,10 @@ func (uc *ComparisonUsecase) SaveAttempt(ctx context.Context, userID uuid.UUID, 
 		}
 	}
 
-	alreadySaved, _ := uc.compRepo.SavedAttemptExists(ctx, userID, attemptID)
+	alreadySaved, savedErr := uc.compRepo.SavedAttemptExists(ctx, userID, attemptID)
+	if savedErr != nil {
+		logger.Warn("failed to check if attempt already saved", "error", savedErr)
+	}
 
 	if err := uc.compRepo.SaveAttempt(ctx, userID, attemptID, danceID, score, includeVideo, userName, isPrivate, timingScore, amplitudeScore, poseScore); err != nil {
 		return err
@@ -311,43 +311,55 @@ func (uc *ComparisonUsecase) SaveAttempt(ctx context.Context, userID uuid.UUID, 
 	}
 
 	if uc.kafkaProducer != nil {
-		payload, _ := json.Marshal(map[string]interface{}{
+		payload, mErr := json.Marshal(map[string]interface{}{
 			"user_id":    userID.String(),
 			"attempt_id": attemptID,
 			"dance_id":   danceID,
 			"score":      score,
 			"is_private": isPrivate,
 		})
-		logger.Info("publishing TopicAttemptSaved to Kafka")
-		uc.kafkaProducer.PublishAsync(ctx, kafka.TopicAttemptSaved, userID.String(), payload, func(err error) {
-			log.GetLoggerFromContext(ctx).Warn("kafka publish TopicAttemptSaved failed", "user_id", userID, "error", err)
-		})
+		if mErr != nil {
+			logger.Warn("failed to marshal attempt.saved payload", "error", mErr)
+		} else {
+			logger.Info("publishing TopicAttemptSaved to Kafka")
+			uc.kafkaProducer.PublishAsync(ctx, kafka.TopicAttemptSaved, userID.String(), payload, func(err error) {
+				log.GetLoggerFromContext(ctx).Warn("kafka publish TopicAttemptSaved failed", "user_id", userID, "error", err)
+			})
+		}
 	} else {
 		uc.triggerAchievementCheck(ctx, userID)
 	}
 
 	if uc.kafkaProducer != nil && score > 0 && score > prevBest {
-		danceTitle, _ := uc.compRepo.GetDanceTitleByID(ctx, danceID)
-		if danceTitle == "" {
+		danceTitle, titleErr := uc.compRepo.GetDanceTitleByID(ctx, danceID)
+		if titleErr != nil || danceTitle == "" {
 			danceTitle = danceID
 		}
-		improvedPayload, _ := json.Marshal(map[string]interface{}{
+		improvedPayload, mErr := json.Marshal(map[string]interface{}{
 			"user_id":     userID.String(),
 			"dance_id":    danceID,
 			"dance_title": danceTitle,
 			"new_score":   score,
 			"delta":       score - prevBest,
 		})
-		uc.kafkaProducer.PublishAsync(ctx, kafka.TopicAttemptImproved, userID.String(), improvedPayload, func(err error) {
-			log.GetLoggerFromContext(ctx).Warn("kafka publish TopicAttemptImproved failed", "user_id", userID, "error", err)
-		})
+		if mErr != nil {
+			logger.Warn("failed to marshal attempt.improved payload", "error", mErr)
+		} else {
+			uc.kafkaProducer.PublishAsync(ctx, kafka.TopicAttemptImproved, userID.String(), improvedPayload, func(err error) {
+				log.GetLoggerFromContext(ctx).Warn("kafka publish TopicAttemptImproved failed", "user_id", userID, "error", err)
+			})
+		}
 	}
 
 	if uc.kafkaProducer != nil {
-		warmupPayload, _ := json.Marshal(map[string]interface{}{"user_id": userID.String()})
-		uc.kafkaProducer.PublishAsync(ctx, kafka.TopicRecommendationWarmup, userID.String(), warmupPayload, func(err error) {
-			log.GetLoggerFromContext(ctx).Warn("kafka publish TopicRecommendationWarmup failed", "user_id", userID, "error", err)
-		})
+		warmupPayload, mErr := json.Marshal(map[string]interface{}{"user_id": userID.String()})
+		if mErr != nil {
+			logger.Warn("failed to marshal recommendation.warmup payload", "error", mErr)
+		} else {
+			uc.kafkaProducer.PublishAsync(ctx, kafka.TopicRecommendationWarmup, userID.String(), warmupPayload, func(err error) {
+				log.GetLoggerFromContext(ctx).Warn("kafka publish TopicRecommendationWarmup failed", "user_id", userID, "error", err)
+			})
+		}
 	}
 
 	uc.maybeNotifyTop10(ctx, userID, logger)
@@ -382,16 +394,19 @@ func (uc *ComparisonUsecase) SaveAttempt(ctx context.Context, userID uuid.UUID, 
 		sc := score
 		pub := uc.ssePublisher
 		go func() {
-			title, _ := uc.compRepo.GetDanceTitleByID(detached, did)
-			if title == "" {
+			title, titleErr := uc.compRepo.GetDanceTitleByID(detached, did)
+			if titleErr != nil || title == "" {
 				title = did
 			}
-			evt, _ := json.Marshal(map[string]interface{}{
+			evt, mErr := json.Marshal(map[string]interface{}{
 				"type":        "attempt_result",
 				"attempt_id":  aid,
 				"dance_title": title,
 				"score":       sc,
 			})
+			if mErr != nil {
+				return
+			}
 			if err := pub.Publish(detached, uid, evt); err != nil {
 				log.GetLoggerFromContext(detached).Warn("sse publish attempt_result failed", "user_id", uid, "error", err)
 			}
@@ -442,7 +457,12 @@ func (uc *ComparisonUsecase) GetCompareResult(ctx context.Context, userID uuid.U
 	}
 
 	if ownerID != nil && *ownerID != userID {
-		if isPrivate, _ := uc.compRepo.IsAttemptPrivate(ctx, userDanceID); isPrivate {
+		isPrivate, privErr := uc.compRepo.IsAttemptPrivate(ctx, userDanceID)
+		if privErr != nil {
+			logger.Warn("failed to check attempt privacy", "error", privErr, "attempt_id", userDanceID)
+			return nil, comparison.ErrorInternalServerError
+		}
+		if isPrivate {
 			return nil, comparison.ErrorForbidden
 		}
 	}
@@ -577,23 +597,30 @@ func (uc *ComparisonUsecase) GetTopDancers(ctx context.Context) ([]models.TopDan
 		}
 	}
 
-	topDancersCacheInstance.mu.Lock()
-	defer topDancersCacheInstance.mu.Unlock()
-
-	if topDancersCacheInstance.entries != nil &&
-		time.Since(topDancersCacheInstance.updatedAt) < topDancersCacheTTL {
-		return topDancersCacheInstance.entries, nil
+	uc.topDancers.mu.Lock()
+	if uc.topDancers.entries != nil && time.Since(uc.topDancers.updatedAt) < topDancersCacheTTL {
+		cached := uc.topDancers.entries
+		uc.topDancers.mu.Unlock()
+		return append([]models.TopDancerEntry(nil), cached...), nil
 	}
+	uc.topDancers.mu.Unlock()
 
-	entries, err := uc.compRepo.GetTopDancers(ctx)
+	v, err, _ := uc.topDancers.group.Do("top", func() (interface{}, error) {
+		entries, err := uc.compRepo.GetTopDancers(ctx)
+		if err != nil {
+			logger.Error("failed to get top dancers from db", "error", err)
+			return nil, err
+		}
+		uc.topDancers.mu.Lock()
+		uc.topDancers.entries = entries
+		uc.topDancers.updatedAt = time.Now()
+		uc.topDancers.mu.Unlock()
+		return entries, nil
+	})
 	if err != nil {
-		logger.Error("failed to get top dancers from db", "error", err)
 		return nil, err
 	}
-
-	topDancersCacheInstance.entries = entries
-	topDancersCacheInstance.updatedAt = time.Now()
-	return entries, nil
+	return append([]models.TopDancerEntry(nil), v.([]models.TopDancerEntry)...), nil
 }
 
 func (uc *ComparisonUsecase) CompareDanceFromBuffer(ctx context.Context, buffer []byte, fileFormat string, referenceDanceID string, userID *uuid.UUID) (*models.CompareResult, error) {
@@ -634,13 +661,18 @@ func (uc *ComparisonUsecase) CompareDanceFromBuffer(ctx context.Context, buffer 
 		"attempt_id":             attemptID,
 	}
 
-	jsonBody, _ := json.Marshal(requestBody)
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return nil, comparison.ErrorInternalServerError
+	}
 	client := &http.Client{Timeout: 20 * time.Second}
 
-	resp, err := mlPost(ctx, client, mlURL, jsonBody)
+	resp, err := uc.mlPost(ctx, client, mlURL, jsonBody)
 	if err != nil {
 		logger.Error("failed to call ml compare", "error", err)
-		uc.storageRepo.DeleteFile(ctx, videoKey)
+		if delErr := uc.storageRepo.DeleteFile(ctx, videoKey); delErr != nil {
+			logger.Warn("failed to delete user video after ml compare error", "error", delErr)
+		}
 		return nil, comparison.ErrorInternalServerError
 	}
 	defer resp.Body.Close()
@@ -652,7 +684,9 @@ func (uc *ComparisonUsecase) CompareDanceFromBuffer(ctx context.Context, buffer 
 		Status  string `json:"status"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&taskResp); err != nil {
-		uc.storageRepo.DeleteFile(ctx, videoKey)
+		if delErr := uc.storageRepo.DeleteFile(ctx, videoKey); delErr != nil {
+			logger.Warn("failed to delete user video after decode error", "error", delErr)
+		}
 		return nil, comparison.ErrorInternalServerError
 	}
 
@@ -727,7 +761,7 @@ func (uc *ComparisonUsecase) waitForCompareResult(ctx context.Context, taskID st
 		case <-time.After(5 * time.Second):
 		}
 
-		resp, err := mlGet(ctx, client, statusURL)
+		resp, err := uc.mlGet(ctx, client, statusURL)
 		if err != nil {
 			logger.Warn("compare status check failed", "error", err)
 			continue
@@ -776,7 +810,10 @@ func (uc *ComparisonUsecase) generateCompareTips(ctx context.Context, score floa
 		"attempt_score": score,
 		"segments":      segPayload,
 	}
-	jsonBody, _ := json.Marshal(body)
+	jsonBody, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal tips request: %w", err)
+	}
 
 	client := &http.Client{Timeout: 90 * time.Second}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, mlURL, bytes.NewBuffer(jsonBody))
@@ -784,8 +821,8 @@ func (uc *ComparisonUsecase) generateCompareTips(ctx context.Context, score floa
 		return nil, fmt.Errorf("build tips request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if token := os.Getenv("ML_INTERNAL_TOKEN"); token != "" {
-		req.Header.Set(mlInternalTokenHeader, token)
+	if uc.mlInternalToken != "" {
+		req.Header.Set(mlInternalTokenHeader, uc.mlInternalToken)
 	}
 
 	resp, err := client.Do(req)
@@ -813,7 +850,7 @@ func (uc *ComparisonUsecase) GetTaskStatus(ctx context.Context, taskID, taskType
 	mlURL := mlServiceURL("status/") + taskID
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	resp, err := mlGet(ctx, client, mlURL)
+	resp, err := uc.mlGet(ctx, client, mlURL)
 	if err != nil {
 		logger.Error("failed to get task status from ML", "error", err)
 		return nil, comparison.ErrorInternalServerError
@@ -874,8 +911,12 @@ func (uc *ComparisonUsecase) GetTaskStatus(ctx context.Context, taskID, taskType
 			DurationSec:         mlResult.DurationSec,
 			VideoPath:           mlResult.VideoPath,
 		}
-		resultBytes, _ := json.Marshal(loadResp)
-		out.Result = resultBytes
+		resultBytes, mErr := json.Marshal(loadResp)
+		if mErr != nil {
+			logger.Warn("failed to marshal load result", "error", mErr)
+		} else {
+			out.Result = resultBytes
+		}
 
 	case "compare":
 		var mlResult models.CompareStatusResult
@@ -904,8 +945,12 @@ func (uc *ComparisonUsecase) GetTaskStatus(ctx context.Context, taskID, taskType
 			logger.Warn("finalizeCompareTask error", "error", finErr)
 		}
 		if compareResult != nil {
-			resultBytes, _ := json.Marshal(compareResult)
-			out.Result = resultBytes
+			resultBytes, mErr := json.Marshal(compareResult)
+			if mErr != nil {
+				logger.Warn("failed to marshal compare result", "error", mErr)
+			} else {
+				out.Result = resultBytes
+			}
 		}
 	}
 

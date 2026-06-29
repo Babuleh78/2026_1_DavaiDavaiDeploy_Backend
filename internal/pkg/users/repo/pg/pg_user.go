@@ -28,7 +28,7 @@ func (u *UserRepository) GetUserByID(ctx context.Context, id uuid.UUID) (models.
 			logger.Error("user not exists")
 			return models.User{}, users.ErrorNotFound
 		}
-		logger.Error("failed to scan user: " + err.Error())
+		logger.Error("failed to scan user", "error", err)
 		return models.User{}, users.ErrorInternalServerError
 	}
 
@@ -50,7 +50,7 @@ func (u *UserRepository) GetUserByLogin(ctx context.Context, login string) (mode
 			logger.Error("user not exists")
 			return models.User{}, users.ErrorNotFound
 		}
-		logger.Error("failed to scan user: " + err.Error())
+		logger.Error("failed to scan user", "error", err)
 		return models.User{}, users.ErrorInternalServerError
 	}
 
@@ -65,7 +65,7 @@ func (u *UserRepository) UpdateUserPassword(ctx context.Context, version int, us
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to update password: " + err.Error())
+		logger.Error("failed to update password", "error", err)
 		return users.ErrorInternalServerError
 	}
 
@@ -101,7 +101,7 @@ func (u *UserRepository) SearchUsers(ctx context.Context, query string, limit in
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query users search: " + err.Error())
+		logger.Error("failed to query users search", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -110,13 +110,13 @@ func (u *UserRepository) SearchUsers(ctx context.Context, query string, limit in
 	for rows.Next() {
 		var it models.UserSearchItem
 		if err := rows.Scan(&it.ID, &it.Login, &it.Avatar); err != nil {
-			logger.Error("failed to scan user search item: " + err.Error())
+			logger.Error("failed to scan user search item", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result = append(result, it)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in SearchUsers: " + err.Error())
+		logger.Error("rows iteration error in SearchUsers", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -135,7 +135,7 @@ func (u *UserRepository) FindUserByLoginOrEmail(ctx context.Context, loginOrEmai
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.User{}, users.ErrorNotFound
 		}
-		logger.Error("botFindUser scan failed: " + err.Error())
+		logger.Error("botFindUser scan failed", "error", err)
 		return models.User{}, users.ErrorInternalServerError
 	}
 	return user, nil
@@ -148,7 +148,7 @@ func (u *UserRepository) UpdateUserTelegramID(ctx context.Context, userID uuid.U
 		return e
 	})
 	if err != nil {
-		logger.Error("botUpdateTelegramID failed: " + err.Error())
+		logger.Error("botUpdateTelegramID failed", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -177,7 +177,7 @@ func (u *UserRepository) SetTelegramLinkCode(ctx context.Context, userID uuid.UU
 		return e
 	})
 	if err != nil {
-		logger.Error("SetTelegramLinkCode failed: " + err.Error())
+		logger.Error("SetTelegramLinkCode failed", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -202,7 +202,7 @@ func (u *UserRepository) LinkTelegramByCode(ctx context.Context, code string, te
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.User{}, users.ErrorNotFound
 		}
-		logger.Error("LinkTelegramByCode failed: " + err.Error())
+		logger.Error("LinkTelegramByCode failed", "error", err)
 		return models.User{}, users.ErrorInternalServerError
 	}
 	return user, nil
@@ -221,7 +221,7 @@ func (u *UserRepository) GetUserByTelegramID(ctx context.Context, telegramID int
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.User{}, users.ErrorNotFound
 		}
-		logger.Error("GetUserByTelegramID scan failed: " + err.Error())
+		logger.Error("GetUserByTelegramID scan failed", "error", err)
 		return models.User{}, users.ErrorInternalServerError
 	}
 	return user, nil

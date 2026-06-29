@@ -33,9 +33,6 @@ type AuthUsecase struct {
 	authRepo auth.AuthRepo
 }
 
-// NewAuthUsecase wires the auth usecase. The JWT signing secret is passed in
-// (validated once at startup) rather than read from the environment here, so
-// every binary uses the same validated value.
 func NewAuthUsecase(repo auth.AuthRepo, secret string) *AuthUsecase {
 	return &AuthUsecase{
 		authRepo: repo,

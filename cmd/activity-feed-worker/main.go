@@ -253,7 +253,6 @@ func main() {
 		meta := map[string]interface{}{
 			"dance_id": msg.DanceID,
 		}
-		// DECISION: dedup key is liker+dance (no per-toggle id available). Besides
 		insertFeedEvent(ctx, dbpool, logger, actorID, "like", "like:"+actorIDStr+":"+msg.DanceID, meta)
 		logFriendCount(ctx, dbpool, logger, fcCache, actorID, "like")
 		return nil

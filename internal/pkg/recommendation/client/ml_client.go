@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -16,14 +15,16 @@ import (
 const mlInternalTokenHeader = "X-Internal-Token"
 
 type MLClient struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL       string
+	internalToken string
+	httpClient    *http.Client
 }
 
-func NewMLClient(baseURL string) *MLClient {
+func NewMLClient(baseURL, internalToken string) *MLClient {
 	return &MLClient{
-		baseURL:    baseURL,
-		httpClient: &http.Client{Timeout: 30 * time.Second},
+		baseURL:       baseURL,
+		internalToken: internalToken,
+		httpClient:    &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -32,8 +33,8 @@ func (c *MLClient) mlURL(path string) string {
 }
 
 func (c *MLClient) setAuthHeader(req *http.Request) {
-	if token := os.Getenv("ML_INTERNAL_TOKEN"); token != "" {
-		req.Header.Set(mlInternalTokenHeader, token)
+	if c.internalToken != "" {
+		req.Header.Set(mlInternalTokenHeader, c.internalToken)
 	}
 }
 
@@ -49,11 +50,14 @@ func (c *MLClient) Recommend(ctx context.Context, query string, dances []models.
 		})
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, err := json.Marshal(map[string]interface{}{
 		"query":  query,
 		"dances": dancesPayload,
 		"limit":  limit,
 	})
+	if err != nil {
+		return nil, "", fmt.Errorf("marshal recommend request: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.mlURL("recommend"), bytes.NewBuffer(body))
 	if err != nil {
@@ -95,11 +99,14 @@ func (c *MLClient) GetSimilar(ctx context.Context, danceID string, dances []mode
 		})
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, err := json.Marshal(map[string]interface{}{
 		"dance_id": danceID,
 		"dances":   dancesPayload,
 		"limit":    limit,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal similar request: %w", err)
+	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.mlURL("similar"), bytes.NewBuffer(body))
 	if err != nil {
@@ -162,7 +169,7 @@ func (c *MLClient) GetPersonalizedReels(ctx context.Context, history []models.Us
 	if friendUploaderIDs == nil {
 		friendUploaderIDs = []string{}
 	}
-	body, _ := json.Marshal(map[string]interface{}{
+	body, mErr := json.Marshal(map[string]interface{}{
 		"user_history":        histPayload,
 		"candidate_dances":    candPayload,
 		"limit":               limit,
@@ -170,6 +177,9 @@ func (c *MLClient) GetPersonalizedReels(ctx context.Context, history []models.Us
 		"behavior_log":        behaviorPayload,
 		"friend_uploader_ids": friendUploaderIDs,
 	})
+	if mErr != nil {
+		return nil, fmt.Errorf("marshal reels_feed request: %w", mErr)
+	}
 
 	reelsCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()

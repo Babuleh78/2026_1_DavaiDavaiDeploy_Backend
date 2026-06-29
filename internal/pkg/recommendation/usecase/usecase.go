@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -15,6 +14,7 @@ import (
 	"DDDance/internal/pkg/utils/log"
 
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/sync/singleflight"
 )
 
 const (
@@ -22,33 +22,60 @@ const (
 	reelsCandidatesCacheTTL = 3 * time.Minute
 )
 
-type recommenderCache struct {
+type candidateCache struct {
 	mu        sync.Mutex
 	items     []models.RecommenderDanceItem
 	updatedAt time.Time
+	group     singleflight.Group
 }
 
-type reelsCandidatesCache struct {
-	mu        sync.Mutex
-	items     []models.RecommenderDanceItem
-	updatedAt time.Time
+func (c *candidateCache) load(ctx context.Context, ttl time.Duration, fetch func(context.Context) ([]models.RecommenderDanceItem, error)) ([]models.RecommenderDanceItem, error) {
+	c.mu.Lock()
+	if c.items != nil && time.Since(c.updatedAt) < ttl {
+		items := c.items
+		c.mu.Unlock()
+		return items, nil
+	}
+	c.mu.Unlock()
+
+	v, err, _ := c.group.Do("load", func() (interface{}, error) {
+		items, err := fetch(ctx)
+		if err != nil {
+			return nil, err
+		}
+		c.mu.Lock()
+		c.items = items
+		c.updatedAt = time.Now()
+		c.mu.Unlock()
+		return items, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return v.([]models.RecommenderDanceItem), nil
 }
 
-var (
-	recommenderCacheInstance     recommenderCache
-	reelsCandidatesCacheInstance reelsCandidatesCache
-)
+func (c *candidateCache) invalidate() {
+	c.mu.Lock()
+	c.items = nil
+	c.mu.Unlock()
+}
 
 type RecommendationUsecase struct {
 	dataRepo   recommendation.RecommendationDataRepo
 	mlClient   recommendation.MLClientInterface
 	reelsCache recommendation.ReelsCache
+	s3Address  string
+
+	recommenderCandidates candidateCache
+	reelsCandidates       candidateCache
 }
 
-func NewRecommendationUsecase(dataRepo recommendation.RecommendationDataRepo, mlClient recommendation.MLClientInterface) *RecommendationUsecase {
+func NewRecommendationUsecase(dataRepo recommendation.RecommendationDataRepo, mlClient recommendation.MLClientInterface, s3Address string) *RecommendationUsecase {
 	return &RecommendationUsecase{
-		dataRepo: dataRepo,
-		mlClient: mlClient,
+		dataRepo:  dataRepo,
+		mlClient:  mlClient,
+		s3Address: s3Address,
 	}
 }
 
@@ -57,56 +84,27 @@ func (uc *RecommendationUsecase) SetReelsCache(c recommendation.ReelsCache) {
 }
 
 func (uc *RecommendationUsecase) InvalidateCache() {
-	recommenderCacheInstance.mu.Lock()
-	recommenderCacheInstance.items = nil
-	recommenderCacheInstance.mu.Unlock()
-
-	reelsCandidatesCacheInstance.mu.Lock()
-	reelsCandidatesCacheInstance.items = nil
-	reelsCandidatesCacheInstance.mu.Unlock()
+	uc.recommenderCandidates.invalidate()
+	uc.reelsCandidates.invalidate()
 }
 
 func (uc *RecommendationUsecase) getDancesForRecommender(ctx context.Context) ([]models.RecommenderDanceItem, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
-
-	recommenderCacheInstance.mu.Lock()
-	defer recommenderCacheInstance.mu.Unlock()
-
-	if recommenderCacheInstance.items != nil &&
-		time.Since(recommenderCacheInstance.updatedAt) < recommenderCacheTTL {
-		return recommenderCacheInstance.items, nil
-	}
-
-	items, err := uc.dataRepo.GetDancesForRecommender(ctx)
+	items, err := uc.recommenderCandidates.load(ctx, recommenderCacheTTL, uc.dataRepo.GetDancesForRecommender)
 	if err != nil {
 		logger.Error("failed to get dances for recommender from db", "error", err)
 		return nil, err
 	}
-
-	recommenderCacheInstance.items = items
-	recommenderCacheInstance.updatedAt = time.Now()
 	return items, nil
 }
 
 func (uc *RecommendationUsecase) getCandidateDancesForReels(ctx context.Context) ([]models.RecommenderDanceItem, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
-
-	reelsCandidatesCacheInstance.mu.Lock()
-	defer reelsCandidatesCacheInstance.mu.Unlock()
-
-	if reelsCandidatesCacheInstance.items != nil &&
-		time.Since(reelsCandidatesCacheInstance.updatedAt) < reelsCandidatesCacheTTL {
-		return reelsCandidatesCacheInstance.items, nil
-	}
-
-	items, err := uc.dataRepo.GetCandidateDancesForReels(ctx)
+	items, err := uc.reelsCandidates.load(ctx, reelsCandidatesCacheTTL, uc.dataRepo.GetCandidateDancesForReels)
 	if err != nil {
 		logger.Error("failed to fetch candidate dances for reels", "error", err)
 		return nil, err
 	}
-
-	reelsCandidatesCacheInstance.items = items
-	reelsCandidatesCacheInstance.updatedAt = time.Now()
 	return items, nil
 }
 
@@ -124,7 +122,7 @@ func (uc *RecommendationUsecase) GetRecommendations(ctx context.Context, query s
 		return nil, fmt.Errorf("recommend request failed: %w", err)
 	}
 
-	s3Address := strings.TrimRight(os.Getenv("S3_ADDRESS"), "/")
+	s3Address := strings.TrimRight(uc.s3Address, "/")
 	danceByID := make(map[string]models.RecommenderDanceItem, len(dances))
 	for _, d := range dances {
 		danceByID[d.ID] = d
@@ -165,7 +163,7 @@ func (uc *RecommendationUsecase) GetSimilarDances(ctx context.Context, danceID s
 		return nil, fmt.Errorf("similar request failed: %w", err)
 	}
 
-	s3Address := strings.TrimRight(os.Getenv("S3_ADDRESS"), "/")
+	s3Address := strings.TrimRight(uc.s3Address, "/")
 	danceByID := make(map[string]models.RecommenderDanceItem, len(dances))
 	for _, d := range dances {
 		danceByID[d.ID] = d
@@ -208,10 +206,15 @@ func (uc *RecommendationUsecase) GetReelsFeed(ctx context.Context, limit, offset
 	if userID != nil {
 		items, err := uc.getPersonalized(ctx, logger, limit, excludeIDs, userID, behaviorLog)
 		if err == nil {
-			total, _ := uc.dataRepo.GetReelsFeedCount(ctx, excludeIDs)
+			total, countErr := uc.dataRepo.GetReelsFeedCount(ctx, excludeIDs)
+			if countErr != nil {
+				logger.Warn("failed to get reels feed count", "error", countErr)
+			}
 			resp := &models.ReelsFeedResponse{Items: items, Total: total}
 			if uc.reelsCache != nil && len(excludeIDs) == 0 {
-				_ = uc.reelsCache.Set(ctx, *userID, resp, 600*time.Second)
+				if setErr := uc.reelsCache.Set(ctx, *userID, resp, 600*time.Second); setErr != nil {
+					logger.Warn("failed to set reels cache", "error", setErr)
+				}
 			}
 			return resp, nil
 		}

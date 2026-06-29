@@ -18,9 +18,6 @@ type ProfileUsecase struct {
 	tokenGenerator profile.TokenGenerator
 }
 
-// NewProfileUsecase wires the profile usecase. The token generator is a
-// required collaborator (used to re-issue tokens after a login change) and is
-// passed at construction.
 func NewProfileUsecase(profileRepo profile.ProfileRepo, storageRepo profile.ProfileStorageRepo, tokenGenerator profile.TokenGenerator) *ProfileUsecase {
 	return &ProfileUsecase{
 		profileRepo:    profileRepo,
@@ -134,11 +131,18 @@ func (uc *ProfileUsecase) GetPublicProfile(ctx context.Context, profileUserID uu
 		}
 	}
 
-	friendsCount, _ := uc.profileRepo.GetFriendsCount(ctx, profileUserID)
+	friendsCount, friendsErr := uc.profileRepo.GetFriendsCount(ctx, profileUserID)
+	if friendsErr != nil {
+		logger.Warn("failed to get friends count", "error", friendsErr)
+	}
 
 	var friendshipStatus *models.FriendshipStatus
 	if viewerUserID != nil && !isOwn {
-		friendshipStatus, _ = uc.profileRepo.GetFriendshipBetween(ctx, *viewerUserID, profileUserID)
+		var fsErr error
+		friendshipStatus, fsErr = uc.profileRepo.GetFriendshipBetween(ctx, *viewerUserID, profileUserID)
+		if fsErr != nil {
+			logger.Warn("failed to get friendship status", "error", fsErr)
+		}
 	}
 
 	var stats *models.ProfileStats

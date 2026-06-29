@@ -20,14 +20,21 @@ const heartbeatInterval = 20 * time.Second
 const maxConnsPerUser = 5
 
 type Handler struct {
-	redisAddr string
+	rdb *redis.Client
 
 	mu    sync.Mutex
 	conns map[string]int
 }
 
 func NewHandler(redisAddr string) *Handler {
-	return &Handler{redisAddr: redisAddr, conns: make(map[string]int)}
+	return &Handler{
+		rdb:   redis.NewClient(&redis.Options{Addr: redisAddr}),
+		conns: make(map[string]int),
+	}
+}
+
+func (h *Handler) Close() error {
+	return h.rdb.Close()
 }
 
 func (h *Handler) acquire(userID string) bool {
@@ -77,11 +84,8 @@ func (h *Handler) ServeSSE(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "keep-alive")
 	w.Header().Set("X-Accel-Buffering", "no")
 
-	client := redis.NewClient(&redis.Options{Addr: h.redisAddr})
-	defer client.Close()
-
 	channel := fmt.Sprintf("channel:user:%s", userID)
-	sub := client.Subscribe(r.Context(), channel)
+	sub := h.rdb.Subscribe(r.Context(), channel)
 	defer sub.Close()
 
 	ch := sub.Channel()
@@ -91,7 +95,7 @@ func (h *Handler) ServeSSE(w http.ResponseWriter, r *http.Request) {
 
 	logger.Info("SSE client connected", "user_id", userID)
 
-	// TODO: close the SSE connection when the JWT expires. ValidateAndGetUser
+	// TODO: закрывать SSE-соединение при истечении срока JWT
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

@@ -107,7 +107,12 @@ func (h *ProfileHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 		defer f.Close()
 
 		sniff := make([]byte, 512)
-		n, _ := f.Read(sniff)
+		n, readErr := f.Read(sniff)
+		if readErr != nil && readErr != io.EOF {
+			log.LogHandlerError(logger, fmt.Errorf("failed to read avatar for sniffing: %w", readErr), http.StatusBadRequest)
+			helpers.WriteError(w, http.StatusBadRequest)
+			return
+		}
 		avatarContentType = http.DetectContentType(sniff[:n])
 		if _, err = f.Seek(0, 0); err != nil {
 			log.LogHandlerError(logger, fmt.Errorf("failed to seek avatar: %w", err), http.StatusInternalServerError)

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/sync/singleflight"
 )
 
 type DanceUsecase struct {
@@ -27,27 +28,39 @@ type DanceUsecase struct {
 	achTrigger       dance.AchievementTrigger
 	cacheInvalidator dance.CacheInvalidator
 	mlLock           dance.MLLock
+
+	s3Address       string
+	mlInternalToken string
+
+	topDances trendingCache
+}
+
+type trendingCache struct {
+	mu        sync.Mutex
+	resp      *models.TrendingResponse
+	updatedAt time.Time
+	group     singleflight.Group
 }
 
 func mlServiceURL(path string) string {
 	return strings.TrimRight(os.Getenv("ML_SERVICE_URL"), "/") + "/ml/" + strings.TrimLeft(path, "/")
 }
 
-// NewDanceUsecase wires the dance usecase. The achievement trigger and cache
-// invalidator are required collaborators and are passed at construction so the
-// usecase is never half-wired. Optional infrastructure (view cache, Kafka, ML
-// lock) is attached via Set* and degrades gracefully when absent.
 func NewDanceUsecase(
 	danceRepo dance.DanceRepo,
 	storageRepo dance.DanceStorageRepo,
 	achTrigger dance.AchievementTrigger,
 	cacheInvalidator dance.CacheInvalidator,
+	s3Address string,
+	mlInternalToken string,
 ) *DanceUsecase {
 	return &DanceUsecase{
 		danceRepo:        danceRepo,
 		storageRepo:      storageRepo,
 		achTrigger:       achTrigger,
 		cacheInvalidator: cacheInvalidator,
+		s3Address:        s3Address,
+		mlInternalToken:  mlInternalToken,
 	}
 }
 
@@ -77,25 +90,25 @@ func (uc *DanceUsecase) triggerAchievementCheck(ctx context.Context, userID uuid
 
 const mlInternalTokenHeader = "X-Internal-Token"
 
-func mlPost(ctx context.Context, client *http.Client, url string, jsonBody []byte) (*http.Response, error) {
+func (uc *DanceUsecase) mlPost(ctx context.Context, client *http.Client, url string, jsonBody []byte) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(jsonBody))
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if token := os.Getenv("ML_INTERNAL_TOKEN"); token != "" {
-		req.Header.Set(mlInternalTokenHeader, token)
+	if uc.mlInternalToken != "" {
+		req.Header.Set(mlInternalTokenHeader, uc.mlInternalToken)
 	}
 	return client.Do(req)
 }
 
-func mlGet(ctx context.Context, client *http.Client, url string) (*http.Response, error) {
+func (uc *DanceUsecase) mlGet(ctx context.Context, client *http.Client, url string) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	if token := os.Getenv("ML_INTERNAL_TOKEN"); token != "" {
-		req.Header.Set(mlInternalTokenHeader, token)
+	if uc.mlInternalToken != "" {
+		req.Header.Set(mlInternalTokenHeader, uc.mlInternalToken)
 	}
 	return client.Do(req)
 }
@@ -140,10 +153,13 @@ func (uc *DanceUsecase) callModerate(ctx context.Context, videoS3Key, danceID, u
 		"uploader_login":   uploaderLogin,
 	}
 
-	jsonBody, _ := json.Marshal(requestBody)
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal moderation request: %w", err)
+	}
 	client := &http.Client{Timeout: 100 * time.Second}
 
-	resp, err := mlPost(ctx, client, moderateURL, jsonBody)
+	resp, err := uc.mlPost(ctx, client, moderateURL, jsonBody)
 	if err != nil {
 		return "", fmt.Errorf("moderation request failed: %w", err)
 	}
@@ -186,10 +202,13 @@ func (uc *DanceUsecase) enqueueProcessing(ctx context.Context, videoKey, danceID
 		"uploader_user_id": uploaderUserID,
 	}
 
-	jsonBody, _ := json.Marshal(requestBody)
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", err
+	}
 	client := &http.Client{Timeout: 20 * time.Second}
 
-	resp, err := mlPost(ctx, client, processingURL, jsonBody)
+	resp, err := uc.mlPost(ctx, client, processingURL, jsonBody)
 	if err != nil {
 		return "", err
 	}
@@ -198,7 +217,9 @@ func (uc *DanceUsecase) enqueueProcessing(ctx context.Context, videoKey, danceID
 	var response struct {
 		TaskID string `json:"task_id"`
 	}
-	json.NewDecoder(resp.Body).Decode(&response)
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return "", err
+	}
 	return response.TaskID, nil
 }
 
@@ -211,10 +232,13 @@ func (uc *DanceUsecase) enqueueProcessingByURL(ctx context.Context, videoURL, da
 		"uploader_user_id": uploaderUserID,
 	}
 
-	jsonBody, _ := json.Marshal(requestBody)
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", err
+	}
 	client := &http.Client{Timeout: 20 * time.Second}
 
-	resp, err := mlPost(ctx, client, processingURL, jsonBody)
+	resp, err := uc.mlPost(ctx, client, processingURL, jsonBody)
 	if err != nil {
 		return "", err
 	}
@@ -223,7 +247,9 @@ func (uc *DanceUsecase) enqueueProcessingByURL(ctx context.Context, videoURL, da
 	var response struct {
 		TaskID string `json:"task_id"`
 	}
-	json.NewDecoder(resp.Body).Decode(&response)
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return "", err
+	}
 	return response.TaskID, nil
 }
 
@@ -240,7 +266,7 @@ func (uc *DanceUsecase) waitForProcessing(ctx context.Context, taskID string, lo
 		case <-time.After(5 * time.Second):
 		}
 
-		resp, err := mlGet(ctx, client, statusURL)
+		resp, err := uc.mlGet(ctx, client, statusURL)
 		if err != nil {
 			logger.Warn("status check failed", "error", err)
 			continue
@@ -332,9 +358,15 @@ func (uc *DanceUsecase) UploadDance(
 
 	lockKey := "ml:processing:" + danceID
 	if uc.mlLock != nil {
-		acquired, _ := uc.mlLock.TryLock(ctx, lockKey, danceID, 600*time.Second)
+		acquired, lockErr := uc.mlLock.TryLock(ctx, lockKey, danceID, 600*time.Second)
+		if lockErr != nil {
+			logger.Warn("ml lock TryLock failed", "error", lockErr, "dance_id", danceID)
+		}
 		if !acquired {
-			existingTaskID, _ := uc.mlLock.GetValue(ctx, lockKey)
+			existingTaskID, getErr := uc.mlLock.GetValue(ctx, lockKey)
+			if getErr != nil {
+				logger.Warn("ml lock GetValue failed", "error", getErr, "dance_id", danceID)
+			}
 			logger.Info("ml processing lock already held, returning existing task", "dance_id", danceID)
 			return &models.UploadDanceResult{DanceID: danceID, TaskID: existingTaskID}, nil
 		}
@@ -343,7 +375,9 @@ func (uc *DanceUsecase) UploadDance(
 	taskID, err := uc.enqueueProcessing(ctx, dancePath, danceID, uploaderUserID)
 	if err != nil {
 		if uc.mlLock != nil {
-			_ = uc.mlLock.Unlock(ctx, lockKey)
+			if unlockErr := uc.mlLock.Unlock(ctx, lockKey); unlockErr != nil {
+				logger.Warn("ml lock Unlock failed", "error", unlockErr, "dance_id", danceID)
+			}
 		}
 		logger.Error("failed to enqueue processing", "error", err)
 		return nil, dance.ErrorInternalServerError
@@ -396,13 +430,17 @@ func (uc *DanceUsecase) FinalizeUploadTask(ctx context.Context, danceID string, 
 	if uploaderUserID != "" {
 		uc.linkUploaderIfPresent(ctx, danceID, uploaderUserID, logger)
 		if uc.kafkaProducer != nil {
-			payload, _ := json.Marshal(map[string]string{
+			payload, mErr := json.Marshal(map[string]string{
 				"user_id":  uploaderUserID,
 				"dance_id": danceID,
 			})
-			uc.kafkaProducer.PublishAsync(ctx, kafka.TopicDanceUploaded, uploaderUserID, payload, func(err error) {
-				logger.Warn("kafka publish TopicDanceUploaded failed", "dance_id", danceID, "error", err)
-			})
+			if mErr != nil {
+				logger.Warn("failed to marshal dance.uploaded payload", "error", mErr)
+			} else {
+				uc.kafkaProducer.PublishAsync(ctx, kafka.TopicDanceUploaded, uploaderUserID, payload, func(err error) {
+					logger.Warn("kafka publish TopicDanceUploaded failed", "dance_id", danceID, "error", err)
+				})
+			}
 		} else {
 			if uid, parseErr := uuid.FromString(uploaderUserID); parseErr == nil {
 				uc.triggerAchievementCheck(ctx, uid)
@@ -572,7 +610,7 @@ func (uc *DanceUsecase) GetMainPage(ctx context.Context) ([]models.VideoItem, er
 		return nil, dance.ErrorInternalServerError
 	}
 
-	s3Address := strings.TrimRight(os.Getenv("S3_ADDRESS"), "/")
+	s3Address := strings.TrimRight(uc.s3Address, "/")
 	var videos []models.VideoItem
 	ids := make([]string, 0, len(topDances))
 
@@ -644,7 +682,7 @@ func (uc *DanceUsecase) GetSegmentDescription(ctx context.Context, danceID strin
 	mlURL := mlServiceURL(fmt.Sprintf("segment_description/%s/%d", danceID, segmentIdx))
 	client := &http.Client{Timeout: 120 * time.Second}
 
-	resp, err := mlGet(ctx, client, mlURL)
+	resp, err := uc.mlGet(ctx, client, mlURL)
 	if err != nil {
 		logger.Error("failed to call ml service", "error", err)
 		return nil, dance.ErrorInternalServerError
@@ -714,7 +752,7 @@ func (uc *DanceUsecase) GetDanceCatalog(ctx context.Context, sort, search string
 		return nil, err
 	}
 
-	s3Address := strings.TrimRight(os.Getenv("S3_ADDRESS"), "/")
+	s3Address := strings.TrimRight(uc.s3Address, "/")
 	for i := range items {
 		items[i].URL = fmt.Sprintf("%s/results/%s/video.mp4", s3Address, items[i].ID)
 	}
@@ -742,7 +780,7 @@ func (uc *DanceUsecase) GetDanceTrending(ctx context.Context) (*models.TrendingR
 		return nil, err
 	}
 
-	s3Address := strings.TrimRight(os.Getenv("S3_ADDRESS"), "/")
+	s3Address := strings.TrimRight(uc.s3Address, "/")
 	videos := make([]models.VideoItem, 0, len(items))
 	for _, item := range items {
 		videos = append(videos, models.VideoItem{
@@ -837,7 +875,10 @@ func (uc *DanceUsecase) UpdateDanceStatus(ctx context.Context, id, status string
 	}
 
 	if dbStatus == "rejected" {
-		reason, _ := uc.danceRepo.GetDanceModerationReason(ctx, id)
+		reason, reasonErr := uc.danceRepo.GetDanceModerationReason(ctx, id)
+		if reasonErr != nil {
+			logger.Warn("failed to get moderation reason", "error", reasonErr, "dance_id", id)
+		}
 		uc.notifyDanceUploaders(ctx, id, "dance_rejected", reason, logger)
 		return nil
 	}
@@ -885,14 +926,18 @@ func (uc *DanceUsecase) RecordDanceView(ctx context.Context, danceID string, vie
 
 	if shouldRecord {
 		if uc.kafkaProducer != nil {
-			payload, _ := json.Marshal(map[string]interface{}{
+			payload, mErr := json.Marshal(map[string]interface{}{
 				"dance_id":  danceID,
 				"viewer_id": viewerID,
 				"timestamp": time.Now().UTC().Unix(),
 			})
-			uc.kafkaProducer.PublishAsync(ctx, kafka.TopicDanceViewed, danceID, payload, func(err error) {
-				log.GetLoggerFromContext(ctx).Warn("kafka publish TopicDanceViewed failed", "dance_id", danceID, "error", err)
-			})
+			if mErr != nil {
+				log.GetLoggerFromContext(ctx).Warn("failed to marshal dance.viewed payload", "error", mErr)
+			} else {
+				uc.kafkaProducer.PublishAsync(ctx, kafka.TopicDanceViewed, danceID, payload, func(err error) {
+					log.GetLoggerFromContext(ctx).Warn("kafka publish TopicDanceViewed failed", "dance_id", danceID, "error", err)
+				})
+			}
 		} else {
 			if err := uc.danceRepo.RecordDanceView(ctx, danceID, viewerID); err != nil {
 				return 0, err
@@ -956,7 +1001,10 @@ func (uc *DanceUsecase) GetDanceModerationStatus(ctx context.Context, danceID st
 	if err != nil {
 		return "", "", dance.ErrorNotFound
 	}
-	reason, _ := uc.danceRepo.GetDanceModerationReason(ctx, danceID)
+	reason, reasonErr := uc.danceRepo.GetDanceModerationReason(ctx, danceID)
+	if reasonErr != nil {
+		log.GetLoggerFromContext(ctx).Warn("failed to get moderation reason", "error", reasonErr, "dance_id", danceID)
+	}
 	return status, reason, nil
 }
 
@@ -1023,52 +1071,59 @@ func (uc *DanceUsecase) DeleteDance(ctx context.Context, userID uuid.UUID, dance
 
 const topDancesCacheTTL = 10 * time.Minute
 
-type topDancesCache struct {
-	mu        sync.Mutex
-	resp      *models.TrendingResponse
-	updatedAt time.Time
-}
-
-var topDancesCacheInstance topDancesCache
-
 func (uc *DanceUsecase) GetTopDances(ctx context.Context) (*models.TrendingResponse, error) {
 	logger := log.GetLoggerFromContext(ctx).With(slog.String("func", log.GetFuncName()))
 
-	topDancesCacheInstance.mu.Lock()
-	defer topDancesCacheInstance.mu.Unlock()
-
-	if topDancesCacheInstance.resp != nil &&
-		time.Since(topDancesCacheInstance.updatedAt) < topDancesCacheTTL {
-		return topDancesCacheInstance.resp, nil
+	uc.topDances.mu.Lock()
+	if uc.topDances.resp != nil && time.Since(uc.topDances.updatedAt) < topDancesCacheTTL {
+		cached := uc.topDances.resp
+		uc.topDances.mu.Unlock()
+		return cloneTrending(cached), nil
 	}
+	uc.topDances.mu.Unlock()
 
-	items, err := uc.danceRepo.GetTopDances(ctx)
+	v, err, _ := uc.topDances.group.Do("top", func() (interface{}, error) {
+		items, err := uc.danceRepo.GetTopDances(ctx)
+		if err != nil {
+			logger.Error("failed to get top dances", "error", err)
+			return nil, err
+		}
+
+		s3Address := strings.TrimRight(uc.s3Address, "/")
+		videos := make([]models.VideoItem, 0, len(items))
+		for _, item := range items {
+			videos = append(videos, models.VideoItem{
+				ID:           item.ID,
+				URL:          fmt.Sprintf("%s/results/%s/video.mp4", s3Address, item.ID),
+				Title:        item.Title,
+				AttemptCount: item.AttemptCount,
+				AvgScore:     item.AvgScore,
+				ViewCount:    item.ViewCount,
+				LikeCount:    item.LikeCount,
+			})
+		}
+
+		resp := &models.TrendingResponse{Count: len(videos), Videos: videos}
+
+		uc.topDances.mu.Lock()
+		uc.topDances.resp = resp
+		uc.topDances.updatedAt = time.Now()
+		uc.topDances.mu.Unlock()
+		return resp, nil
+	})
 	if err != nil {
-		logger.Error("failed to get top dances", "error", err)
 		return nil, err
 	}
+	return cloneTrending(v.(*models.TrendingResponse)), nil
+}
 
-	s3Address := strings.TrimRight(os.Getenv("S3_ADDRESS"), "/")
-	videos := make([]models.VideoItem, 0, len(items))
-	for _, item := range items {
-		videos = append(videos, models.VideoItem{
-			ID:           item.ID,
-			URL:          fmt.Sprintf("%s/results/%s/video.mp4", s3Address, item.ID),
-			Title:        item.Title,
-			AttemptCount: item.AttemptCount,
-			AvgScore:     item.AvgScore,
-			ViewCount:    item.ViewCount,
-			LikeCount:    item.LikeCount,
-		})
+func cloneTrending(r *models.TrendingResponse) *models.TrendingResponse {
+	if r == nil {
+		return nil
 	}
-
-	resp := &models.TrendingResponse{
-		Count:  len(videos),
-		Videos: videos,
-	}
-	topDancesCacheInstance.resp = resp
-	topDancesCacheInstance.updatedAt = time.Now()
-	return resp, nil
+	cp := *r
+	cp.Videos = append([]models.VideoItem(nil), r.Videos...)
+	return &cp
 }
 
 func (uc *DanceUsecase) GetDanceChoreographerDescriptions(ctx context.Context, danceID string) (map[int]string, error) {

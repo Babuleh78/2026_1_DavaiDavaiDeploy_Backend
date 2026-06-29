@@ -15,7 +15,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// DECISION: gated by env instead of always-on — prod nginx sets TRUST_PROXY_HEADERS=true.
 var trustProxyHeaders = os.Getenv("TRUST_PROXY_HEADERS") == "true"
 
 type RedisRateLimiter struct {

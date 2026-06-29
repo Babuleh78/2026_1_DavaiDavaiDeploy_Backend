@@ -13,17 +13,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	uuid "github.com/satori/go.uuid"
+	"golang.org/x/sync/singleflight"
 )
 
 type avgAchievementsCache struct {
 	mu        sync.Mutex
 	value     float64
 	updatedAt time.Time
+	group     singleflight.Group
 }
 
-var avgAchievementsCacheInstance avgAchievementsCache
-
-// DECISION: "special" achievements that require event-specific data (night_dancer: upload time,
 func (uc *UserUsecase) triggerAchievementCheck(ctx context.Context, userID uuid.UUID) {
 	detached := context.WithoutCancel(ctx)
 	go func() {
@@ -152,7 +151,6 @@ func (uc *UserUsecase) CheckAndUnlockAchievements(ctx context.Context, userID uu
 	return newlyUnlocked, nil
 }
 
-// DECISION: uses UTC because user timezone is not stored in the database.
 func (uc *UserUsecase) triggerNightDancerAchievement(ctx context.Context, userID uuid.UUID) {
 	if time.Now().UTC().Hour() >= 5 {
 		return
@@ -243,18 +241,28 @@ func (uc *UserUsecase) GetAllAchievements(ctx context.Context) ([]models.Achieve
 }
 
 func (uc *UserUsecase) getAvgUnlocked(ctx context.Context) float64 {
-	avgAchievementsCacheInstance.mu.Lock()
-	defer avgAchievementsCacheInstance.mu.Unlock()
-	if avgAchievementsCacheInstance.value > 0 && time.Since(avgAchievementsCacheInstance.updatedAt) < time.Hour {
-		return avgAchievementsCacheInstance.value
+	c := &uc.avgAchievements
+
+	c.mu.Lock()
+	if c.value > 0 && time.Since(c.updatedAt) < time.Hour {
+		v := c.value
+		c.mu.Unlock()
+		return v
 	}
-	avg, err := uc.userRepo.GetAvgAchievementUnlockCount(ctx)
-	if err != nil || avg <= 0 {
-		return 1 // safe fallback: avoid division by zero
-	}
-	avgAchievementsCacheInstance.value = avg
-	avgAchievementsCacheInstance.updatedAt = time.Now()
-	return avg
+	c.mu.Unlock()
+
+	v, _, _ := c.group.Do("avg", func() (interface{}, error) {
+		avg, err := uc.userRepo.GetAvgAchievementUnlockCount(ctx)
+		if err != nil || avg <= 0 {
+			return float64(1), nil
+		}
+		c.mu.Lock()
+		c.value = avg
+		c.updatedAt = time.Now()
+		c.mu.Unlock()
+		return avg, nil
+	})
+	return v.(float64)
 }
 
 func (uc *UserUsecase) GetUserAchievements(ctx context.Context, userID uuid.UUID) (*models.AchievementsWithMeta, error) {

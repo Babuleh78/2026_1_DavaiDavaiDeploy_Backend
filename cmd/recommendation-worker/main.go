@@ -49,8 +49,8 @@ func main() {
 	defer dbpool.Close()
 
 	pgRepo := userRepo.NewUserRepository(dbpool)
-	mlClient := recommendClient.NewMLClient(os.Getenv("ML_SERVICE_URL"))
-	uc := recommendUsecase.NewRecommendationUsecase(pgRepo, mlClient)
+	mlClient := recommendClient.NewMLClient(os.Getenv("ML_SERVICE_URL"), os.Getenv("ML_INTERNAL_TOKEN"))
+	uc := recommendUsecase.NewRecommendationUsecase(pgRepo, mlClient, os.Getenv("S3_ADDRESS"))
 	uc.SetReelsCache(redisRepo.NewReelsCache(redisAddr))
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))

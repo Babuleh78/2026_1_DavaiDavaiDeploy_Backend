@@ -28,7 +28,7 @@ func (u *UserRepository) GetReelsFeed(ctx context.Context, limit, offset int, ex
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query reels feed: " + err.Error())
+		logger.Error("failed to query reels feed", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -50,13 +50,13 @@ func (u *UserRepository) GetReelsFeed(ctx context.Context, limit, offset int, ex
 			&item.AttemptCount,
 			&item.UserLiked,
 		); err != nil {
-			logger.Error("failed to scan reel item: " + err.Error())
+			logger.Error("failed to scan reel item", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows error in reels feed: " + err.Error())
+		logger.Error("rows error in reels feed", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 
@@ -76,7 +76,7 @@ func (u *UserRepository) GetUserReelsHistory(ctx context.Context, userID uuid.UU
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query user reels history: " + err.Error())
+		logger.Error("failed to query user reels history", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -86,14 +86,14 @@ func (u *UserRepository) GetUserReelsHistory(ctx context.Context, userID uuid.UU
 		var item models.UserReelsHistoryItem
 		var viewedAt time.Time
 		if err := rows.Scan(&item.DanceID, &item.Score, &viewedAt, &item.Liked); err != nil {
-			logger.Error("failed to scan reels history item: " + err.Error())
+			logger.Error("failed to scan reels history item", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		item.ViewedAt = viewedAt.UTC().Format(time.RFC3339)
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows error in reels history: " + err.Error())
+		logger.Error("rows error in reels history", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 
@@ -118,7 +118,7 @@ func (u *UserRepository) GetReelsByIDs(ctx context.Context, ids []string, userID
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query reels by ids: " + err.Error())
+		logger.Error("failed to query reels by ids", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -140,13 +140,13 @@ func (u *UserRepository) GetReelsByIDs(ctx context.Context, ids []string, userID
 			&item.AttemptCount,
 			&item.UserLiked,
 		); err != nil {
-			logger.Error("failed to scan reel item by id: " + err.Error())
+			logger.Error("failed to scan reel item by id", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows error in reels by ids: " + err.Error())
+		logger.Error("rows error in reels by ids", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	if items == nil {
@@ -165,7 +165,7 @@ func (u *UserRepository) GetCandidateDancesForReels(ctx context.Context) ([]mode
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query candidate dances for reels: " + err.Error())
+		logger.Error("failed to query candidate dances for reels", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -174,13 +174,13 @@ func (u *UserRepository) GetCandidateDancesForReels(ctx context.Context) ([]mode
 	for rows.Next() {
 		var item models.RecommenderDanceItem
 		if err := rows.Scan(&item.ID, &item.Title, &item.Description, &item.AvgScore, &item.ViewCount, &item.UploaderID, &item.CreatedAt); err != nil {
-			logger.Error("failed to scan candidate dance: " + err.Error())
+			logger.Error("failed to scan candidate dance", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows error in candidate dances for reels: " + err.Error())
+		logger.Error("rows error in candidate dances for reels", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	if items == nil {
@@ -197,7 +197,7 @@ func (u *UserRepository) GetReelsFeedCount(ctx context.Context, excludeIDs []str
 		return u.db.QueryRow(ctx, GetReelsFeedCountQuery, excludeIDs).Scan(&count)
 	})
 	if err != nil {
-		logger.Error("failed to count reels: " + err.Error())
+		logger.Error("failed to count reels", "error", err)
 		return 0, users.ErrorInternalServerError
 	}
 	return count, nil

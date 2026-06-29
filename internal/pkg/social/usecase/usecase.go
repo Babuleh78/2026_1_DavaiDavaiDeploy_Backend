@@ -20,9 +20,6 @@ type SocialUsecase struct {
 	kafkaProducer social.KafkaPublisher
 }
 
-// NewSocialUsecase wires the social usecase. The achievement trigger is a
-// required collaborator and is passed at construction. Kafka is optional and
-// attached via Set*.
 func NewSocialUsecase(socialRepo social.SocialRepo, achTrigger social.AchievementTrigger) *SocialUsecase {
 	return &SocialUsecase{socialRepo: socialRepo, achTrigger: achTrigger}
 }
@@ -65,15 +62,19 @@ func (uc *SocialUsecase) ToggleLike(ctx context.Context, userID uuid.UUID, dance
 		if author, aErr := uc.socialRepo.GetDanceAuthor(ctx, danceID); aErr == nil && author != nil {
 			if authorID, pErr := uuid.FromString(author.ID); pErr == nil {
 				if uc.kafkaProducer != nil {
-					payload, _ := json.Marshal(map[string]interface{}{
+					payload, mErr := json.Marshal(map[string]interface{}{
 						"user_id":  authorID.String(),
 						"liker_id": userID.String(),
 						"dance_id": danceID,
 						"liked":    true,
 					})
-					uc.kafkaProducer.PublishAsync(ctx, kafka.TopicLikeToggled, authorID.String(), payload, func(err error) {
-						log.GetLoggerFromContext(ctx).Warn("kafka publish TopicLikeToggled failed", "dance_id", danceID, "error", err)
-					})
+					if mErr != nil {
+						log.GetLoggerFromContext(ctx).Warn("failed to marshal like.toggled payload", "error", mErr)
+					} else {
+						uc.kafkaProducer.PublishAsync(ctx, kafka.TopicLikeToggled, authorID.String(), payload, func(err error) {
+							log.GetLoggerFromContext(ctx).Warn("kafka publish TopicLikeToggled failed", "dance_id", danceID, "error", err)
+						})
+					}
 				} else {
 					uc.triggerAchievementCheck(ctx, authorID)
 				}

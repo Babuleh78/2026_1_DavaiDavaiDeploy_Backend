@@ -78,7 +78,9 @@ func main() {
 			if mErr != nil {
 				continue
 			}
-			_ = ssePub.Publish(ctx, userID.String(), payload)
+			if pErr := ssePub.Publish(ctx, userID.String(), payload); pErr != nil {
+				log.Printf("achievements-worker: sse publish failed: %v", pErr)
+			}
 		}
 	}
 
@@ -171,7 +173,7 @@ func main() {
 		if err := json.Unmarshal(value, &msg); err != nil || msg.UserID == "" {
 			return nil
 		}
-		payload, _ := json.Marshal(map[string]interface{}{
+		payload, mErr := json.Marshal(map[string]interface{}{
 			"to_user_id": msg.UserID,
 			"type":       "personal_record",
 			"telegram_payload": map[string]interface{}{
@@ -180,6 +182,10 @@ func main() {
 				"delta":       msg.Delta,
 			},
 		})
+		if mErr != nil {
+			logger.Warn("achievements-worker: marshal personal_record payload failed", "user_id", msg.UserID, "error", mErr)
+			return nil
+		}
 		producer.PublishAsync(ctx, kafka.TopicNotificationSend, msg.UserID, payload, func(pubErr error) {
 			logger.Warn("achievements-worker: publish notification.send failed", "user_id", msg.UserID, "error", pubErr)
 		})

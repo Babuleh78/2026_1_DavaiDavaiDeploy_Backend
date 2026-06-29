@@ -1,11 +1,3 @@
-// Package config centralises environment-based configuration for the main API
-// binary. Instead of scattering os.Getenv calls across packages, startup config
-// is read and validated once in Load.
-//
-// Scope note: this covers the cmd/main service. Startup secrets and flags
-// (DB/S3/JWT/bot/admin/cookie) are read here. A few request-time lookups inside
-// usecases (e.g. ML_INTERNAL_TOKEN, S3_ADDRESS) are intentionally left where
-// they are read; they can be migrated here over time.
 package config
 
 import (
@@ -17,7 +9,6 @@ import (
 
 const minJWTSecretLen = 32
 
-// Config is the validated configuration for the main API binary.
 type Config struct {
 	DB    DBConfig
 	S3    S3Config
@@ -27,40 +18,31 @@ type Config struct {
 	JWTSecret    string
 	MLServiceURL string
 
-	// BotSecret / AdminToken are shared secrets compared on every request to the
-	// /bot and /admin routers. Read once here so the comparison sites receive a
-	// value rather than calling os.Getenv per request.
+	S3Address       string
+	MLInternalToken string
+
 	BotSecret  string
 	AdminToken string
 
-	// Cookie flags for auth/CSRF cookies. CookieSameSite is "Strict" or anything
-	// else (treated as Lax) — kept as a raw string so net/http stays out of config.
 	CookieSecure   bool
 	CookieSameSite string
 
 	MainAddr    string
 	MetricsPort string
 
-	AuthGRPC  GRPCClientConfig
-	NotifGRPC GRPCClientConfig
-	// AllowInsecureGRPC must be explicitly set to permit connecting to gRPC
-	// services without TLS. Without it, a missing CA is a fatal error rather
-	// than a silent insecure fallback.
+	AuthGRPC          GRPCClientConfig
+	NotifGRPC         GRPCClientConfig
 	AllowInsecureGRPC bool
 
 	UserVideoTTLHours             int
 	UserVideoCleanupPeriodMinutes int
 }
 
-// DBConfig holds Postgres connection settings.
 type DBConfig struct {
 	Host, Port, User, Password, Name string
-	// SSLMode is the libpq sslmode (disable/require/verify-full/...). Empty is
-	// treated as "disable" so existing callers keep working.
-	SSLMode string
+	SSLMode                          string
 }
 
-// DSN renders the pgx connection string.
 func (d DBConfig) DSN() string {
 	sslMode := d.SSLMode
 	if sslMode == "" {
@@ -72,14 +54,6 @@ func (d DBConfig) DSN() string {
 	)
 }
 
-// DSNFromEnv builds a Postgres DSN from the DB_* environment variables. It is
-// the single source of truth for binaries that do not load the full Config
-// (auth, notifications and the Kafka workers), so the connection string —
-// including TLS — stays consistent across every binary.
-//
-// DECISION: DB_SSLMODE defaults to "disable" to avoid breaking the local/dev
-// stack (its Postgres has no TLS). Prod must set DB_SSLMODE=require (or stricter)
-// so DB traffic is encrypted.
 func DSNFromEnv() string {
 	return DBConfig{
 		Host:     os.Getenv("DB_HOST"),
@@ -91,7 +65,6 @@ func DSNFromEnv() string {
 	}.DSN()
 }
 
-// S3Config holds S3-compatible storage settings.
 type S3Config struct {
 	Endpoint    string
 	Bucket      string
@@ -100,37 +73,28 @@ type S3Config struct {
 	InsecureTLS bool
 }
 
-// RedisConfig holds Redis settings. Addr == "" means Redis features are off.
 type RedisConfig struct {
 	Addr string
 }
 
-// Enabled reports whether Redis-backed features should be wired.
 func (r RedisConfig) Enabled() bool { return r.Addr != "" }
 
-// KafkaConfig holds Kafka settings. Empty Brokers means Kafka is off.
 type KafkaConfig struct {
 	Brokers []string
 }
 
-// Enabled reports whether Kafka publishing should be wired.
 func (k KafkaConfig) Enabled() bool { return len(k.Brokers) > 0 }
 
-// GRPCClientConfig holds a gRPC dial target plus optional TLS CA.
 type GRPCClientConfig struct {
 	Host   string
 	Port   string
 	CAFile string
 }
 
-// Enabled reports whether a host is configured for this client.
 func (g GRPCClientConfig) Enabled() bool { return g.Host != "" }
 
-// Target renders the host:port dial address.
 func (g GRPCClientConfig) Target() string { return g.Host + ":" + g.Port }
 
-// Load reads configuration from the environment and validates it. A non-nil
-// error means the binary must not start.
 func Load() (*Config, error) {
 	cfg := &Config{
 		DB: DBConfig{
@@ -146,16 +110,18 @@ func Load() (*Config, error) {
 			SecretKey:   os.Getenv("AWS_SECRET_ACCESS_KEY"),
 			InsecureTLS: os.Getenv("S3_INSECURE_TLS") == "true",
 		},
-		Redis:          RedisConfig{Addr: os.Getenv("REDIS_ADDR")},
-		Kafka:          KafkaConfig{Brokers: splitNonEmpty(os.Getenv("KAFKA_BROKERS"))},
-		JWTSecret:      os.Getenv("JWT_SECRET"),
-		MLServiceURL:   os.Getenv("ML_SERVICE_URL"),
-		BotSecret:      os.Getenv("BOT_SECRET"),
-		AdminToken:     os.Getenv("ADMIN_TOKEN"),
-		CookieSecure:   os.Getenv("COOKIE_SECURE") == "true",
-		CookieSameSite: os.Getenv("COOKIE_SAMESITE"),
-		MainAddr:       ":5458",
-		MetricsPort:    envOr("METRICS_PORT", "9091"),
+		Redis:           RedisConfig{Addr: os.Getenv("REDIS_ADDR")},
+		Kafka:           KafkaConfig{Brokers: splitNonEmpty(os.Getenv("KAFKA_BROKERS"))},
+		JWTSecret:       os.Getenv("JWT_SECRET"),
+		MLServiceURL:    os.Getenv("ML_SERVICE_URL"),
+		S3Address:       os.Getenv("S3_ADDRESS"),
+		MLInternalToken: os.Getenv("ML_INTERNAL_TOKEN"),
+		BotSecret:       os.Getenv("BOT_SECRET"),
+		AdminToken:      os.Getenv("ADMIN_TOKEN"),
+		CookieSecure:    os.Getenv("COOKIE_SECURE") == "true",
+		CookieSameSite:  os.Getenv("COOKIE_SAMESITE"),
+		MainAddr:        ":5458",
+		MetricsPort:     envOr("METRICS_PORT", "9091"),
 		AuthGRPC: GRPCClientConfig{
 			Host:   envOr("AUTH_SERVICE_HOST", "auth"),
 			Port:   envOr("AUTH_SERVICE_PORT", "5459"),
@@ -177,8 +143,6 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// ValidateJWTSecret enforces a single, consistent rule for the signing secret
-// across every binary that issues or verifies tokens.
 func ValidateJWTSecret(secret string) error {
 	if len(secret) < minJWTSecretLen {
 		return fmt.Errorf("JWT_SECRET must be at least %d characters, got %d", minJWTSecretLen, len(secret))
@@ -186,8 +150,6 @@ func ValidateJWTSecret(secret string) error {
 	return nil
 }
 
-// MustJWTSecret returns a validated JWT secret or an error, for binaries that do
-// not load the full Config (auth service, workers).
 func MustJWTSecret() (string, error) {
 	secret := os.Getenv("JWT_SECRET")
 	if err := ValidateJWTSecret(secret); err != nil {

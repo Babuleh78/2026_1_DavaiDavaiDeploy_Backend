@@ -78,7 +78,6 @@ func runUserVideoCleanupWorker(ctx context.Context, usersUC comparison.Compariso
 		}
 	}
 
-	// Initial delay, but stay responsive to shutdown.
 	select {
 	case <-ctx.Done():
 		return
@@ -161,9 +160,6 @@ func initS3Client(ctx context.Context, s3Cfg config.S3Config) (*s3.Client, strin
 	return client, s3Cfg.Bucket, nil
 }
 
-// dialGRPC connects to a gRPC service. It is secure by default: a CA file gives
-// TLS; otherwise it refuses to connect unless insecure transport was explicitly
-// opted into (GRPC_ALLOW_INSECURE=true). Insecure is never a silent fallback.
 func dialGRPC(target config.GRPCClientConfig, allowInsecure bool, name string) (*grpc.ClientConn, error) {
 	var creds grpccreds.TransportCredentials
 	switch {
@@ -183,7 +179,6 @@ func dialGRPC(target config.GRPCClientConfig, allowInsecure bool, name string) (
 	return grpc.Dial(target.Target(), grpc.WithTransportCredentials(creds))
 }
 
-// appHandlers bundles the HTTP handlers needed for route registration.
 type appHandlers struct {
 	auth       *authHandlers.AuthHandler
 	user       *userHandlers.UserHandler
@@ -409,18 +404,17 @@ func main() {
 	userPgRepo := userRepo.NewUserRepository(dbpool)
 	userS3Repo := storageRepo.NewS3Repository(s3Client, s3Bucket)
 
-	// --- usecases (required collaborators via constructors, ordered by deps) ---
 	authUC := authUsecase.NewAuthUsecase(authRepo.NewAuthRepository(dbpool), cfg.JWTSecret)
 	usersUC := userUsecase.NewUserUsecase(userPgRepo, userS3Repo, cfg.JWTSecret)
 
-	mlClient := recommendClient.NewMLClient(cfg.MLServiceURL)
-	recommendUC := recommendUsecase.NewRecommendationUsecase(userPgRepo, mlClient)
-	danceUC := danceUsecase.NewDanceUsecase(userPgRepo, userS3Repo, usersUC, recommendUC)
+	mlClient := recommendClient.NewMLClient(cfg.MLServiceURL, cfg.MLInternalToken)
+	recommendUC := recommendUsecase.NewRecommendationUsecase(userPgRepo, mlClient, cfg.S3Address)
+	danceUC := danceUsecase.NewDanceUsecase(userPgRepo, userS3Repo, usersUC, recommendUC, cfg.S3Address, cfg.MLInternalToken)
 	comparisonUC := comparisonUsecase.NewComparisonUsecase(userPgRepo, userS3Repo, usersUC, usersUC, danceUC)
+	comparisonUC.SetMLInternalToken(cfg.MLInternalToken)
 	socialUC := socialUsecase.NewSocialUsecase(userPgRepo, usersUC)
 	profileUC := profileUsecase.NewProfileUsecase(userPgRepo, userS3Repo, usersUC)
 
-	// --- optional infrastructure (degrades gracefully when absent) ---
 	if cfg.Redis.Enabled() {
 		addr := cfg.Redis.Addr
 		danceUC.SetViewCache(redisRepo.NewViewCache(addr))
@@ -459,7 +453,7 @@ func main() {
 	handlers := appHandlers{
 		auth:       authHandlers.NewAuthHandler(authClient, authUC),
 		user:       userHandlers.NewUserHandler(authClient, usersUC, comparisonUC, danceUC, cfg.CookieSecure, cfg.CookieSameSite),
-		dance:      danceHttp.NewDanceHandler(danceUC),
+		dance:      danceHttp.NewDanceHandler(danceUC, cfg.CookieSecure, cfg.CookieSameSite, cfg.MLInternalToken),
 		comparison: comparisonHttp.NewComparisonHandler(comparisonUC),
 		social:     socialHttp.NewSocialHandler(socialUC),
 		profile:    profileHttp.NewProfileHandler(profileUC),
@@ -517,6 +511,13 @@ func main() {
 		log.Printf("Graceful shutdown failed: %v", err)
 		os.Exit(1)
 	}
-	_ = metricsServer.Shutdown(shutdownCtx)
+	if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+		log.Printf("metrics server shutdown failed: %v", err)
+	}
+	if handlers.events != nil {
+		if err := handlers.events.Close(); err != nil {
+			log.Printf("events handler close failed: %v", err)
+		}
+	}
 	log.Printf("Graceful shutdown complete")
 }

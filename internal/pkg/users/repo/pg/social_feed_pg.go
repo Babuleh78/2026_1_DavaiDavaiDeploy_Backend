@@ -30,7 +30,7 @@ func (u *UserRepository) GetFriendsFeed(ctx context.Context, userID uuid.UUID, l
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query friends feed: " + err.Error())
+		logger.Error("failed to query friends feed", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -39,13 +39,13 @@ func (u *UserRepository) GetFriendsFeed(ctx context.Context, userID uuid.UUID, l
 	for rows.Next() {
 		var item models.FeedItem
 		if err := rows.Scan(&item.ID, &item.ActionType, &item.Metadata, &item.CreatedAt, &item.ActorLogin, &item.ActorAvatar, &item.DanceTitle, &item.ActorID); err != nil {
-			logger.Error("failed to scan feed item: " + err.Error())
+			logger.Error("failed to scan feed item", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows error in friends feed: " + err.Error())
+		logger.Error("rows error in friends feed", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return items, nil

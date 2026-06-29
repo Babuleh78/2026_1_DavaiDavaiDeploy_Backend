@@ -22,11 +22,10 @@ type UserUsecase struct {
 	notifSender   users.NotificationSender
 	kafkaProducer users.KafkaPublisher
 	ssePublisher  users.SSEPublisher
+
+	avgAchievements avgAchievementsCache
 }
 
-// NewUserUsecase wires the user usecase. The JWT signing secret is passed in
-// (validated once at startup via config.ValidateJWTSecret) rather than read and
-// validated here, so every binary shares one consistent rule.
 func NewUserUsecase(userRepo users.UsersRepo, storageRepo users.StorageRepo, secret string) *UserUsecase {
 	return &UserUsecase{
 		secret:      secret,

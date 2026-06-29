@@ -39,9 +39,6 @@ type UserHandler struct {
 	cookieSamesite http.SameSite
 }
 
-// NewUserHandler wires the user handler. The comparison and dance usecases are
-// required collaborators and are passed at construction so handlers never face
-// a nil usecase.
 func NewUserHandler(client gen.AuthClient, uc users.UsersUsecase, compUC comparison.ComparisonUsecase, danceUC dance.DanceUsecase, cookieSecure bool, cookieSameSite string) *UserHandler {
 	samesite := http.SameSiteLaxMode
 	if cookieSameSite == "Strict" {
@@ -261,9 +258,6 @@ func (h *UserHandler) OptionalAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// AdminTokenMiddleware guards the /admin router with a bearer token. The token
-// is supplied at construction (read once from config) and compared in constant
-// time so the comparison does not leak the token via response timing.
 func AdminTokenMiddleware(adminToken string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

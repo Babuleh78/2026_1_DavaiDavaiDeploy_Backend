@@ -21,7 +21,7 @@ func (u *UserRepository) GetAllAchievements(ctx context.Context) ([]models.Achie
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get achievements: " + err.Error())
+		logger.Error("failed to get achievements", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -30,13 +30,13 @@ func (u *UserRepository) GetAllAchievements(ctx context.Context) ([]models.Achie
 	for rows.Next() {
 		var a models.Achievement
 		if err := rows.Scan(&a.ID, &a.Code, &a.Title, &a.Description, &a.IconKey, &a.Category, &a.Threshold); err != nil {
-			logger.Error("failed to scan achievement: " + err.Error())
+			logger.Error("failed to scan achievement", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result = append(result, a)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetAllAchievements: " + err.Error())
+		logger.Error("rows iteration error in GetAllAchievements", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -51,7 +51,7 @@ func (u *UserRepository) GetUserAchievements(ctx context.Context, userID uuid.UU
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get user achievements: " + err.Error())
+		logger.Error("failed to get user achievements", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -63,13 +63,13 @@ func (u *UserRepository) GetUserAchievements(ctx context.Context, userID uuid.UU
 			&a.ID, &a.Code, &a.Title, &a.Description,
 			&a.IconKey, &a.Category, &a.Threshold, &a.UnlockedAt,
 		); err != nil {
-			logger.Error("failed to scan user achievement: " + err.Error())
+			logger.Error("failed to scan user achievement", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result = append(result, a)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetUserAchievements: " + err.Error())
+		logger.Error("rows iteration error in GetUserAchievements", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -86,7 +86,7 @@ func (u *UserRepository) UnlockAchievement(ctx context.Context, userID uuid.UUID
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to unlock achievement: " + err.Error())
+		logger.Error("failed to unlock achievement", "error", err)
 		return false, users.ErrorInternalServerError
 	}
 	return rowsAffected > 0, nil
@@ -99,7 +99,7 @@ func (u *UserRepository) GetAvgAchievementUnlockCount(ctx context.Context) (floa
 		return u.db.QueryRow(ctx, GetAvgUnlockedAchievementsQuery).Scan(&avg)
 	})
 	if err != nil {
-		logger.Error("failed to get avg unlocked achievements: " + err.Error())
+		logger.Error("failed to get avg unlocked achievements", "error", err)
 		return 0, users.ErrorInternalServerError
 	}
 	return avg, nil
@@ -121,7 +121,7 @@ func (u *UserRepository) GetUserStatsForAchievements(ctx context.Context, userID
 		)
 	})
 	if err != nil {
-		logger.Error("failed to get user stats for achievements: " + err.Error())
+		logger.Error("failed to get user stats for achievements", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return &s, nil

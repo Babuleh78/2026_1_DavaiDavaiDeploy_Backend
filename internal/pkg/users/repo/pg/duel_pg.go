@@ -24,7 +24,7 @@ func (u *UserRepository) CreateDuel(ctx context.Context, mode string, challenger
 			Scan(&duelID, &inviteToken)
 	})
 	if err != nil {
-		logger.Error("failed to create duel: " + err.Error())
+		logger.Error("failed to create duel", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 
@@ -64,7 +64,7 @@ func (u *UserRepository) GetDuelByID(ctx context.Context, duelID uuid.UUID) (*mo
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, users.ErrorNotFound
 		}
-		logger.Error("failed to get duel by id: " + err.Error())
+		logger.Error("failed to get duel by id", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return &d, nil
@@ -80,7 +80,7 @@ func (u *UserRepository) GetDuelsByUser(ctx context.Context, userID uuid.UUID, l
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get duels by user: " + err.Error())
+		logger.Error("failed to get duels by user", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -111,13 +111,13 @@ func (u *UserRepository) GetDuelsByUser(ctx context.Context, userID uuid.UUID, l
 			&d.DanceTitle,
 			&d.InviteToken,
 		); err != nil {
-			logger.Error("failed to scan duel row: " + err.Error())
+			logger.Error("failed to scan duel row", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result = append(result, d)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetDuelsByUser: " + err.Error())
+		logger.Error("rows iteration error in GetDuelsByUser", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -133,7 +133,7 @@ func (u *UserRepository) GetPublicDuels(ctx context.Context, limit, offset int) 
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get public duels: " + err.Error())
+		logger.Error("failed to get public duels", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -164,13 +164,13 @@ func (u *UserRepository) GetPublicDuels(ctx context.Context, limit, offset int) 
 			&d.DanceTitle,
 			&d.InviteToken,
 		); err != nil {
-			logger.Error("failed to scan public duel row: " + err.Error())
+			logger.Error("failed to scan public duel row", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result = append(result, d)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetPublicDuels: " + err.Error())
+		logger.Error("rows iteration error in GetPublicDuels", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -199,7 +199,7 @@ func (u *UserRepository) UpdateDuelStatus(ctx context.Context, duelID uuid.UUID,
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to update duel status: " + err.Error())
+		logger.Error("failed to update duel status", "error", err)
 		return users.ErrorInternalServerError
 	}
 	if rowsAffected == 0 {
@@ -219,7 +219,7 @@ func (u *UserRepository) ExpireDuels(ctx context.Context) ([]uuid.UUID, error) {
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to expire duels: " + err.Error())
+		logger.Error("failed to expire duels", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -228,13 +228,13 @@ func (u *UserRepository) ExpireDuels(ctx context.Context) ([]uuid.UUID, error) {
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
-			logger.Error("failed to scan expired duel id: " + err.Error())
+			logger.Error("failed to scan expired duel id", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in ExpireDuels: " + err.Error())
+		logger.Error("rows iteration error in ExpireDuels", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return ids, nil
@@ -252,7 +252,7 @@ func (u *UserRepository) CreateDuelNotification(ctx context.Context, toUserID uu
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to create duel notification: " + err.Error())
+		logger.Error("failed to create duel notification", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -277,7 +277,7 @@ func (u *UserRepository) GetBatchDuelParticipants(ctx context.Context, duelIDs [
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get batch duel participants: " + err.Error())
+		logger.Error("failed to get batch duel participants", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -286,13 +286,13 @@ func (u *UserRepository) GetBatchDuelParticipants(ctx context.Context, duelIDs [
 	for rows.Next() {
 		var p models.DuelParticipants
 		if err := rows.Scan(&p.ID, &p.ChallengerID, &p.OpponentID); err != nil {
-			logger.Error("failed to scan duel participants row: " + err.Error())
+			logger.Error("failed to scan duel participants row", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result = append(result, p)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetBatchDuelParticipants: " + err.Error())
+		logger.Error("rows iteration error in GetBatchDuelParticipants", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -306,7 +306,7 @@ func (u *UserRepository) GetDistinctChallengersCount(ctx context.Context, oppone
 		return u.db.QueryRow(ctx, GetDistinctChallengersCountQuery, opponentID).Scan(&count)
 	})
 	if err != nil {
-		logger.Error("failed to get distinct challengers count: " + err.Error())
+		logger.Error("failed to get distinct challengers count", "error", err)
 		return 0, users.ErrorInternalServerError
 	}
 	return count, nil
@@ -323,7 +323,7 @@ func (u *UserRepository) GetRandomDance(ctx context.Context) (string, error) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", users.ErrorNotFound
 		}
-		logger.Error("failed to get random dance: " + err.Error())
+		logger.Error("failed to get random dance", "error", err)
 		return "", users.ErrorInternalServerError
 	}
 	return danceID, nil
@@ -336,7 +336,7 @@ func (u *UserRepository) GetDuelStats(ctx context.Context, userID uuid.UUID) (*m
 		return u.db.QueryRow(ctx, GetDuelStatsQuery, userID).Scan(&s.Total, &s.Wins, &s.AvgScore)
 	})
 	if err != nil {
-		logger.Error("failed to get duel stats: " + err.Error())
+		logger.Error("failed to get duel stats", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	if s.Total > 0 {

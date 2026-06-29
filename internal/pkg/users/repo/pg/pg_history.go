@@ -18,7 +18,7 @@ func (u *UserRepository) AddToHistory(ctx context.Context, userID uuid.UUID, dan
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to add to history: " + err.Error())
+		logger.Error("failed to add to history", "error", err)
 		return users.ErrorInternalServerError
 	}
 	logger.Info("successfully added to search history")
@@ -34,7 +34,7 @@ func (u *UserRepository) GetHistory(ctx context.Context, userID uuid.UUID) ([]mo
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get history: " + err.Error())
+		logger.Error("failed to get history", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -43,13 +43,13 @@ func (u *UserRepository) GetHistory(ctx context.Context, userID uuid.UUID) ([]mo
 	for rows.Next() {
 		var item models.SearchHistoryItem
 		if err := rows.Scan(&item.ID, &item.UserID, &item.DanceID, &item.Name, &item.SourceURL, &item.CreatedAt, &item.DanceTitle, &item.Score); err != nil {
-			logger.Error("failed to scan history item: " + err.Error())
+			logger.Error("failed to scan history item", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetHistory: " + err.Error())
+		logger.Error("rows iteration error in GetHistory", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return items, nil
@@ -66,7 +66,7 @@ func (u *UserRepository) DeleteFromHistory(ctx context.Context, historyID uuid.U
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to delete from history: " + err.Error())
+		logger.Error("failed to delete from history", "error", err)
 		return users.ErrorInternalServerError
 	}
 	if rowsAffected == 0 {
@@ -87,7 +87,7 @@ func (u *UserRepository) UpdateHistoryName(ctx context.Context, historyID uuid.U
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to update history name: " + err.Error())
+		logger.Error("failed to update history name", "error", err)
 		return users.ErrorInternalServerError
 	}
 	if rowsAffected == 0 {
@@ -104,7 +104,7 @@ func (u *UserRepository) CleanHistory(ctx context.Context, userID uuid.UUID) err
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to clean history: " + err.Error())
+		logger.Error("failed to clean history", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil

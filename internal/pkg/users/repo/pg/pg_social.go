@@ -27,13 +27,13 @@ func (u *UserRepository) ToggleLike(ctx context.Context, userID uuid.UUID, dance
 				return e
 			})
 			if err != nil {
-				logger.Error("failed to delete like: " + err.Error())
+				logger.Error("failed to delete like", "error", err)
 				return false, users.ErrorInternalServerError
 			}
 			logger.Info("like removed")
 			return false, nil
 		}
-		logger.Error("failed to toggle like: " + err.Error())
+		logger.Error("failed to toggle like", "error", err)
 		return false, users.ErrorInternalServerError
 	}
 
@@ -48,7 +48,7 @@ func (u *UserRepository) GetLikesCount(ctx context.Context, danceID string) (int
 		return u.db.QueryRow(ctx, GetLikesCountQuery, danceID).Scan(&count)
 	})
 	if err != nil {
-		logger.Error("failed to get likes count: " + err.Error())
+		logger.Error("failed to get likes count", "error", err)
 		return 0, users.ErrorInternalServerError
 	}
 	return count, nil
@@ -61,7 +61,7 @@ func (u *UserRepository) IsLikedByUser(ctx context.Context, userID uuid.UUID, da
 		return u.db.QueryRow(ctx, IsLikedByUserQuery, userID, danceID).Scan(&exists)
 	})
 	if err != nil {
-		logger.Error("failed to check like: " + err.Error())
+		logger.Error("failed to check like", "error", err)
 		return false, users.ErrorInternalServerError
 	}
 	return exists, nil
@@ -76,7 +76,7 @@ func (u *UserRepository) GetTopLikedDances(ctx context.Context, limit int) ([]mo
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get top dances: " + err.Error())
+		logger.Error("failed to get top dances", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -85,13 +85,13 @@ func (u *UserRepository) GetTopLikedDances(ctx context.Context, limit int) ([]mo
 	for rows.Next() {
 		var s models.DanceLikeStat
 		if err := rows.Scan(&s.DanceID, &s.LikesCount); err != nil {
-			logger.Error("failed to scan dance stat: " + err.Error())
+			logger.Error("failed to scan dance stat", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		stats = append(stats, s)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetTopLikedDances: " + err.Error())
+		logger.Error("rows iteration error in GetTopLikedDances", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return stats, nil
@@ -106,7 +106,7 @@ func (u *UserRepository) GetUserLikedDances(ctx context.Context, userID uuid.UUI
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get liked dances: " + err.Error())
+		logger.Error("failed to get liked dances", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -116,7 +116,7 @@ func (u *UserRepository) GetUserLikedDances(ctx context.Context, userID uuid.UUI
 		var l models.DanceLike
 		var historyID *string
 		if err := rows.Scan(&historyID, &l.DanceID, &l.Name, &l.DanceTitle, &l.CreatedAt); err != nil {
-			logger.Error("failed to scan like: " + err.Error())
+			logger.Error("failed to scan like", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		if historyID != nil {
@@ -125,7 +125,7 @@ func (u *UserRepository) GetUserLikedDances(ctx context.Context, userID uuid.UUI
 		likes = append(likes, l)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetUserLikedDances: " + err.Error())
+		logger.Error("rows iteration error in GetUserLikedDances", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return likes, nil
@@ -139,7 +139,7 @@ func (u *UserRepository) SaveRating(ctx context.Context, userID uuid.UUID, input
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to save rating: " + err.Error())
+		logger.Error("failed to save rating", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -155,7 +155,7 @@ func (u *UserRepository) GetAggregatedRating(ctx context.Context, videoID string
 		)
 	})
 	if err != nil {
-		logger.Error("failed to get rating: " + err.Error())
+		logger.Error("failed to get rating", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return &r, nil
@@ -170,7 +170,7 @@ func (u *UserRepository) GetFriendsDanceScores(ctx context.Context, userID uuid.
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query friends dance scores: " + err.Error())
+		logger.Error("failed to query friends dance scores", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -179,13 +179,13 @@ func (u *UserRepository) GetFriendsDanceScores(ctx context.Context, userID uuid.
 	for rows.Next() {
 		var fs models.FriendScore
 		if err := rows.Scan(&fs.Login, &fs.AvatarURL, &fs.BestScore); err != nil {
-			logger.Error("failed to scan friend score: " + err.Error())
+			logger.Error("failed to scan friend score", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result = append(result, fs)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetFriendsDanceScores: " + err.Error())
+		logger.Error("rows iteration error in GetFriendsDanceScores", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -204,7 +204,7 @@ func (u *UserRepository) CreateNotification(ctx context.Context, userID uuid.UUI
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to create notification: " + err.Error())
+		logger.Error("failed to create notification", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -219,7 +219,7 @@ func (u *UserRepository) GetNotifications(ctx context.Context, userID uuid.UUID)
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query notifications: " + err.Error())
+		logger.Error("failed to query notifications", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -228,13 +228,13 @@ func (u *UserRepository) GetNotifications(ctx context.Context, userID uuid.UUID)
 	for rows.Next() {
 		var n models.Notification
 		if err := rows.Scan(&n.ID, &n.Type, &n.DanceID, &n.Reason, &n.IsRead, &n.CreatedAt, &n.FromUserID, &n.FromLogin, &n.RefID, &n.DuelID); err != nil {
-			logger.Error("failed to scan notification: " + err.Error())
+			logger.Error("failed to scan notification", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, n)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetNotifications: " + err.Error())
+		logger.Error("rows iteration error in GetNotifications", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return items, nil
@@ -247,7 +247,7 @@ func (u *UserRepository) MarkNotificationRead(ctx context.Context, id int64, use
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to mark notification read: " + err.Error())
+		logger.Error("failed to mark notification read", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -260,7 +260,7 @@ func (u *UserRepository) MarkAllNotificationsRead(ctx context.Context, userID uu
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to mark all notifications read: " + err.Error())
+		logger.Error("failed to mark all notifications read", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -273,7 +273,7 @@ func (u *UserRepository) ClearNotifications(ctx context.Context, userID uuid.UUI
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to clear notifications: " + err.Error())
+		logger.Error("failed to clear notifications", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -306,7 +306,7 @@ func (u *UserRepository) UpdateFriendshipStatus(ctx context.Context, friendshipI
 		if errors.Is(err, pgx.ErrNoRows) {
 			return uuid.Nil, users.ErrorNotFound
 		}
-		logger.Error("failed to update friendship status: " + err.Error())
+		logger.Error("failed to update friendship status", "error", err)
 		return uuid.Nil, users.ErrorInternalServerError
 	}
 	return senderID, nil
@@ -321,7 +321,7 @@ func (u *UserRepository) GetFriends(ctx context.Context, userID uuid.UUID) ([]mo
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query friends: " + err.Error())
+		logger.Error("failed to query friends", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -330,13 +330,13 @@ func (u *UserRepository) GetFriends(ctx context.Context, userID uuid.UUID) ([]mo
 	for rows.Next() {
 		var f models.Friend
 		if err := rows.Scan(&f.UserID, &f.Login, &f.Avatar, &f.FriendedAt, &f.ActiveDuelID); err != nil {
-			logger.Error("failed to scan friend: " + err.Error())
+			logger.Error("failed to scan friend", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result = append(result, f)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetFriends: " + err.Error())
+		logger.Error("rows iteration error in GetFriends", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -349,7 +349,7 @@ func (u *UserRepository) GetFriendsCount(ctx context.Context, userID uuid.UUID) 
 		return u.db.QueryRow(ctx, GetFriendsCountQuery, userID).Scan(&count)
 	})
 	if err != nil {
-		logger.Error("failed to count friends: " + err.Error())
+		logger.Error("failed to count friends", "error", err)
 		return 0, users.ErrorInternalServerError
 	}
 	return count, nil
@@ -367,7 +367,7 @@ func (u *UserRepository) GetFriendshipBetween(ctx context.Context, userID, other
 		if errors.Is(err, pgx.ErrNoRows) {
 			return &models.FriendshipStatus{Status: "none"}, nil
 		}
-		logger.Error("failed to get friendship: " + err.Error())
+		logger.Error("failed to get friendship", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return &models.FriendshipStatus{
@@ -384,7 +384,7 @@ func (u *UserRepository) DeleteFriendship(ctx context.Context, userID, friendID 
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to delete friendship: " + err.Error())
+		logger.Error("failed to delete friendship", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -397,7 +397,7 @@ func (u *UserRepository) CreateFriendNotification(ctx context.Context, toUserID,
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to create friend notification: " + err.Error())
+		logger.Error("failed to create friend notification", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil

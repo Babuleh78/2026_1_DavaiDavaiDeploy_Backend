@@ -59,7 +59,7 @@ func (u *UserRepository) GetFriendIDs(ctx context.Context, userID uuid.UUID) ([]
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query friend ids: " + err.Error())
+		logger.Error("failed to query friend ids", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -67,7 +67,7 @@ func (u *UserRepository) GetFriendIDs(ctx context.Context, userID uuid.UUID) ([]
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			logger.Error("failed to scan friend id: " + err.Error())
+			logger.Error("failed to scan friend id", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		ids = append(ids, id)

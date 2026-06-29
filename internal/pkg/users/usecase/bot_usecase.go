@@ -31,7 +31,7 @@ func (u *UserUsecase) GenerateTelegramLinkCode(ctx context.Context, userID uuid.
 
 	buf := make([]byte, 5) // 40 bits -> 10 hex chars
 	if _, err := rand.Read(buf); err != nil {
-		logger.Error("rand.Read failed: " + err.Error())
+		logger.Error("rand.Read failed", "error", err)
 		return "", err
 	}
 	code := hex.EncodeToString(buf)
@@ -55,7 +55,7 @@ func (u *UserUsecase) LinkTelegramAccount(ctx context.Context, code string, tele
 		if errors.Is(err, users.ErrorNotFound) {
 			return &models.BotAuthResponse{OK: false, Error: "invalid or expired code"}, nil
 		}
-		logger.Error("LinkTelegramByCode failed: " + err.Error())
+		logger.Error("LinkTelegramByCode failed", "error", err)
 		return nil, err
 	}
 
@@ -112,7 +112,7 @@ func (u *UserUsecase) BotPushNotification(ctx context.Context, telegramID int64,
 	}
 	data, err := json.Marshal(msg)
 	if err != nil {
-		logger.Error("BotPushNotification marshal failed: " + err.Error())
+		logger.Error("BotPushNotification marshal failed", "error", err)
 		return nil
 	}
 

@@ -88,14 +88,23 @@ func handleAttemptSaved(ctx context.Context, rdb *redis.Client, producer *kafka.
 	streakKey := fmt.Sprintf("streak:%s", msg.UserID)
 	lastKey := fmt.Sprintf("streak_last:%s", msg.UserID)
 
-	lastDate, _ := rdb.Get(ctx, lastKey).Result()
+	lastDate, getErr := rdb.Get(ctx, lastKey).Result()
+	if getErr != nil && getErr != redis.Nil {
+		logger.Warn("streak-worker: get last date failed", "user_id", msg.UserID, "error", getErr)
+		return nil
+	}
 
 	var newStreak int64
 	switch {
 	case lastDate == today:
 		return nil
 	case lastDate == utcYesterday():
-		newStreak, _ = rdb.Incr(ctx, streakKey).Result()
+		var incrErr error
+		newStreak, incrErr = rdb.Incr(ctx, streakKey).Result()
+		if incrErr != nil {
+			logger.Warn("streak-worker: incr streak failed", "user_id", msg.UserID, "error", incrErr)
+			return nil
+		}
 	default:
 		rdb.Set(ctx, streakKey, 1, 48*time.Hour)
 		newStreak = 1
@@ -134,20 +143,32 @@ func runStreakReminders(ctx context.Context, rdb *redis.Client, producer *kafka.
 		userID := strings.TrimPrefix(streakKey, "streak:")
 		lastKey := fmt.Sprintf("streak_last:%s", userID)
 
-		lastDate, _ := rdb.Get(ctx, lastKey).Result()
+		lastDate, getErr := rdb.Get(ctx, lastKey).Result()
+		if getErr != nil && getErr != redis.Nil {
+			logger.Warn("streak-worker: get last date failed", "user_id", userID, "error", getErr)
+			continue
+		}
 		if lastDate != yesterday {
 			continue
 		}
 
 		notifKey := fmt.Sprintf("streak_notified:%s:%s", userID, today)
-		ok, _ := rdb.SetNX(ctx, notifKey, "1", 24*time.Hour).Result()
+		ok, setErr := rdb.SetNX(ctx, notifKey, "1", 24*time.Hour).Result()
+		if setErr != nil {
+			logger.Warn("streak-worker: SetNX notify flag failed", "user_id", userID, "error", setErr)
+			continue
+		}
 		if !ok {
-			continue // already sent today
+			continue
 		}
 
-		streakVal, _ := rdb.Get(ctx, streakKey).Result()
-		streak, _ := strconv.ParseInt(streakVal, 10, 64)
-		if streak <= 0 {
+		streakVal, getErr := rdb.Get(ctx, streakKey).Result()
+		if getErr != nil && getErr != redis.Nil {
+			logger.Warn("streak-worker: get streak value failed", "user_id", userID, "error", getErr)
+			continue
+		}
+		streak, parseErr := strconv.ParseInt(streakVal, 10, 64)
+		if parseErr != nil || streak <= 0 {
 			continue
 		}
 
@@ -159,13 +180,17 @@ func runStreakReminders(ctx context.Context, rdb *redis.Client, producer *kafka.
 }
 
 func publishStreakNotif(ctx context.Context, producer *kafka.KafkaProducer, logger *slog.Logger, userID, notifType string, streak int64) {
-	payload, _ := json.Marshal(map[string]interface{}{
+	payload, mErr := json.Marshal(map[string]interface{}{
 		"to_user_id": userID,
 		"type":       notifType,
 		"telegram_payload": map[string]interface{}{
 			"streak": streak,
 		},
 	})
+	if mErr != nil {
+		logger.Warn("streak-worker: marshal notification payload failed", "user_id", userID, "error", mErr)
+		return
+	}
 	producer.PublishAsync(ctx, kafka.TopicNotificationSend, userID, payload, func(err error) {
 		logger.Warn("streak-worker: publish notification.send failed", "user_id", userID, "type", notifType, "error", err)
 	})

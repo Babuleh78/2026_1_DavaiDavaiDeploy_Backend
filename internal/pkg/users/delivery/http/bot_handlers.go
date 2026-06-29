@@ -18,9 +18,6 @@ import (
 	uuid "github.com/satori/go.uuid"
 )
 
-// BotSecretMiddleware guards the /bot router with a shared secret. The secret is
-// supplied at construction (read once from config) and compared in constant time
-// to avoid leaking it through response-timing differences.
 func BotSecretMiddleware(secret string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

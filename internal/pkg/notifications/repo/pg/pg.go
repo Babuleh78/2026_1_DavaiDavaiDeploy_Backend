@@ -32,7 +32,7 @@ func (r *NotificationsRepository) CreateDuelNotification(ctx context.Context, to
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to create duel notification: " + err.Error())
+		logger.Error("failed to create duel notification", "error", err)
 		return err
 	}
 	return nil
@@ -47,7 +47,7 @@ func (r *NotificationsRepository) GetNotifications(ctx context.Context, userID u
 		return err
 	})
 	if err != nil {
-		logger.Error("failed to query notifications: " + err.Error())
+		logger.Error("failed to query notifications", "error", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -56,13 +56,13 @@ func (r *NotificationsRepository) GetNotifications(ctx context.Context, userID u
 	for rows.Next() {
 		var n models.Notification
 		if err := rows.Scan(&n.ID, &n.Type, &n.DanceID, &n.Reason, &n.IsRead, &n.CreatedAt, &n.FromUserID, &n.FromLogin, &n.RefID); err != nil {
-			logger.Error("failed to scan notification: " + err.Error())
+			logger.Error("failed to scan notification", "error", err)
 			return nil, err
 		}
 		items = append(items, n)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetNotifications: " + err.Error())
+		logger.Error("rows iteration error in GetNotifications", "error", err)
 		return nil, err
 	}
 	return items, nil
@@ -75,7 +75,7 @@ func (r *NotificationsRepository) MarkNotificationRead(ctx context.Context, id i
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to mark notification read: " + err.Error())
+		logger.Error("failed to mark notification read", "error", err)
 		return err
 	}
 	return nil

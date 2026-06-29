@@ -24,7 +24,6 @@ type viewEvent struct {
 	ViewerID string `json:"viewer_id"`
 }
 
-// DECISION: track viewer_id so ON CONFLICT DO NOTHING in dance_views still deduplicates correctly.
 type viewAccumulator struct {
 	mu     sync.Mutex
 	events map[string]map[string]bool // dance_id → set of viewer_ids

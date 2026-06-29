@@ -21,7 +21,7 @@ func (u *UserRepository) RecordDanceAttempt(ctx context.Context, danceID string,
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to record dance attempt: " + err.Error())
+		logger.Error("failed to record dance attempt", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -34,7 +34,7 @@ func (u *UserRepository) CreateCompareTask(ctx context.Context, taskID, danceID,
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to create compare task: " + err.Error())
+		logger.Error("failed to create compare task", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -52,7 +52,7 @@ func (u *UserRepository) GetCompareTask(ctx context.Context, taskID string) (mod
 		if errors.Is(err, pgx.ErrNoRows) {
 			return models.CompareTask{}, users.ErrorNotFound
 		}
-		logger.Error("failed to get compare task: " + err.Error())
+		logger.Error("failed to get compare task", "error", err)
 		return models.CompareTask{}, users.ErrorInternalServerError
 	}
 	return task, nil
@@ -69,7 +69,7 @@ func (u *UserRepository) MarkCompareTaskFinalized(ctx context.Context, taskID st
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to mark compare task finalized: " + err.Error())
+		logger.Error("failed to mark compare task finalized", "error", err)
 		return false, users.ErrorInternalServerError
 	}
 	return rowsAffected == 1, nil
@@ -88,7 +88,7 @@ func (u *UserRepository) GetDanceLeaderboard(ctx context.Context, danceID string
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get leaderboard: " + err.Error())
+		logger.Error("failed to get leaderboard", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -97,13 +97,13 @@ func (u *UserRepository) GetDanceLeaderboard(ctx context.Context, danceID string
 	for rows.Next() {
 		var e models.LeaderboardEntry
 		if err := rows.Scan(&e.Rank, &e.Login, &e.Score, &e.UserID, &e.Avatar); err != nil {
-			logger.Error("failed to scan leaderboard row: " + err.Error())
+			logger.Error("failed to scan leaderboard row", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		entries = append(entries, e)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetDanceLeaderboard: " + err.Error())
+		logger.Error("rows iteration error in GetDanceLeaderboard", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	if entries == nil {
@@ -122,7 +122,7 @@ func (u *UserRepository) GetUserDanceRank(ctx context.Context, danceID string, u
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		logger.Error("failed to get user rank: " + err.Error())
+		logger.Error("failed to get user rank", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	e.UserID = userID
@@ -137,7 +137,7 @@ func (u *UserRepository) GetUserGlobalRank(ctx context.Context, userID uuid.UUID
 		return u.db.QueryRow(ctx, GetUserGlobalRankQuery, userID).Scan(&rank)
 	})
 	if err != nil {
-		logger.Error("failed to get user global rank: " + err.Error())
+		logger.Error("failed to get user global rank", "error", err)
 		return 0, users.ErrorInternalServerError
 	}
 	return rank, nil
@@ -150,7 +150,7 @@ func (u *UserRepository) SaveAttempt(ctx context.Context, userID uuid.UUID, atte
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to save attempt: " + err.Error())
+		logger.Error("failed to save attempt", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -163,7 +163,7 @@ func (u *UserRepository) EnsureSavedAttemptForDuel(ctx context.Context, userID u
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to ensure saved attempt for duel: " + err.Error())
+		logger.Error("failed to ensure saved attempt for duel", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -212,7 +212,7 @@ func (u *UserRepository) IsSavedAttemptWithVideo(ctx context.Context, userID uui
 		return u.db.QueryRow(ctx, IsSavedAttemptWithVideoQuery, attemptID, userID).Scan(&exists)
 	})
 	if err != nil {
-		logger.Error("failed to check saved attempt video flag: " + err.Error())
+		logger.Error("failed to check saved attempt video flag", "error", err)
 		return false, users.ErrorInternalServerError
 	}
 	return exists, nil
@@ -225,7 +225,7 @@ func (u *UserRepository) SavedAttemptExists(ctx context.Context, userID uuid.UUI
 		return u.db.QueryRow(ctx, SavedAttemptExistsQuery, attemptID, userID).Scan(&exists)
 	})
 	if err != nil {
-		logger.Error("failed to check saved attempt existence: " + err.Error())
+		logger.Error("failed to check saved attempt existence", "error", err)
 		return false, users.ErrorInternalServerError
 	}
 	return exists, nil
@@ -238,7 +238,7 @@ func (u *UserRepository) IsAttemptPrivate(ctx context.Context, attemptID string)
 		return u.db.QueryRow(ctx, IsAttemptPrivateQuery, attemptID).Scan(&isPrivate)
 	})
 	if err != nil {
-		logger.Error("failed to check attempt privacy: " + err.Error())
+		logger.Error("failed to check attempt privacy", "error", err)
 		return false, users.ErrorInternalServerError
 	}
 	return isPrivate, nil
@@ -251,7 +251,7 @@ func (u *UserRepository) UnsaveAttempt(ctx context.Context, userID uuid.UUID, at
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to unsave attempt: " + err.Error())
+		logger.Error("failed to unsave attempt", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -266,7 +266,7 @@ func (u *UserRepository) GetSavedAttempts(ctx context.Context, userID uuid.UUID,
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query saved attempts: " + err.Error())
+		logger.Error("failed to query saved attempts", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -275,7 +275,7 @@ func (u *UserRepository) GetSavedAttempts(ctx context.Context, userID uuid.UUID,
 	for rows.Next() {
 		var it models.SavedAttemptItem
 		if err := rows.Scan(&it.UserDanceID, &it.DanceID, &it.DanceTitle, &it.Score, &it.SavedAt, &it.HasVideo, &it.UserName, &it.IsPrivate); err != nil {
-			logger.Error("failed to scan saved attempt: " + err.Error())
+			logger.Error("failed to scan saved attempt", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 
@@ -288,7 +288,7 @@ func (u *UserRepository) GetSavedAttempts(ctx context.Context, userID uuid.UUID,
 		items = append(items, it)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetSavedAttempts: " + err.Error())
+		logger.Error("rows iteration error in GetSavedAttempts", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return items, nil
@@ -303,7 +303,7 @@ func (u *UserRepository) GetUserAttempts(ctx context.Context, userID uuid.UUID, 
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query user attempts: " + err.Error())
+		logger.Error("failed to query user attempts", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -312,13 +312,13 @@ func (u *UserRepository) GetUserAttempts(ctx context.Context, userID uuid.UUID, 
 	for rows.Next() {
 		var it models.UserAttemptItem
 		if err := rows.Scan(&it.AttemptID, &it.DanceID, &it.DanceTitle, &it.Score, &it.CreatedAt, &it.IsSaved, &it.IsOpen, &it.UserName, &it.Rank, &it.TotalDancers); err != nil {
-			logger.Error("failed to scan user attempt: " + err.Error())
+			logger.Error("failed to scan user attempt", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, it)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetUserAttempts: " + err.Error())
+		logger.Error("rows iteration error in GetUserAttempts", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return items, nil
@@ -333,7 +333,7 @@ func (u *UserRepository) GetDanceProgress(ctx context.Context, userID uuid.UUID,
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query dance progress: " + err.Error())
+		logger.Error("failed to query dance progress", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -342,13 +342,13 @@ func (u *UserRepository) GetDanceProgress(ctx context.Context, userID uuid.UUID,
 	for rows.Next() {
 		var it models.DanceProgressEntry
 		if err := rows.Scan(&it.AttemptID, &it.Score, &it.CreatedAt); err != nil {
-			logger.Error("failed to scan dance progress entry: " + err.Error())
+			logger.Error("failed to scan dance progress entry", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, it)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetDanceProgress: " + err.Error())
+		logger.Error("rows iteration error in GetDanceProgress", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return items, nil
@@ -363,7 +363,7 @@ func (u *UserRepository) GetUserActivity(ctx context.Context, userID uuid.UUID) 
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query user activity: " + err.Error())
+		logger.Error("failed to query user activity", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -372,13 +372,13 @@ func (u *UserRepository) GetUserActivity(ctx context.Context, userID uuid.UUID) 
 	for rows.Next() {
 		var it models.ActivityEntry
 		if err := rows.Scan(&it.Day, &it.Count); err != nil {
-			logger.Error("failed to scan activity entry: " + err.Error())
+			logger.Error("failed to scan activity entry", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, it)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetUserActivity: " + err.Error())
+		logger.Error("rows iteration error in GetUserActivity", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return items, nil
@@ -395,7 +395,7 @@ func (u *UserRepository) GetMostImprovedDance(ctx context.Context, userID uuid.U
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		logger.Error("failed to query most improved dance: " + err.Error())
+		logger.Error("failed to query most improved dance", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return &it, nil
@@ -410,7 +410,7 @@ func (u *UserRepository) GetReelsAttempts(ctx context.Context, limit, offset int
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query reels attempts: " + err.Error())
+		logger.Error("failed to query reels attempts", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -419,14 +419,14 @@ func (u *UserRepository) GetReelsAttempts(ctx context.Context, limit, offset int
 	for rows.Next() {
 		var it models.ReelsAttemptItem
 		if err := rows.Scan(&it.AttemptID, &it.DanceID, &it.DanceTitle, &it.UserID, &it.UserLogin, &it.UserAvatar, &it.Score); err != nil {
-			logger.Error("failed to scan reels attempt: " + err.Error())
+			logger.Error("failed to scan reels attempt", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		it.VideoKey = fmt.Sprintf("users/%s/%s/video.mp4", it.UserID, it.AttemptID)
 		items = append(items, it)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetReelsAttempts: " + err.Error())
+		logger.Error("rows iteration error in GetReelsAttempts", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return items, nil
@@ -442,7 +442,7 @@ func (u *UserRepository) GetCreatorAnalytics(ctx context.Context, userID uuid.UU
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query creator daily stats: " + err.Error())
+		logger.Error("failed to query creator daily stats", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer dailyRows.Close()
@@ -451,13 +451,13 @@ func (u *UserRepository) GetCreatorAnalytics(ctx context.Context, userID uuid.UU
 	for dailyRows.Next() {
 		var it models.CreatorDailyStats
 		if err := dailyRows.Scan(&it.Day, &it.Views, &it.Likes, &it.Attempts); err != nil {
-			logger.Error("failed to scan creator daily stats: " + err.Error())
+			logger.Error("failed to scan creator daily stats", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		daily = append(daily, it)
 	}
 	if err := dailyRows.Err(); err != nil {
-		logger.Error("rows iteration error in GetCreatorAnalytics (daily): " + err.Error())
+		logger.Error("rows iteration error in GetCreatorAnalytics (daily)", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	dailyRows.Close()
@@ -469,7 +469,7 @@ func (u *UserRepository) GetCreatorAnalytics(ctx context.Context, userID uuid.UU
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query creator top dances: " + err.Error())
+		logger.Error("failed to query creator top dances", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer topRows.Close()
@@ -478,13 +478,13 @@ func (u *UserRepository) GetCreatorAnalytics(ctx context.Context, userID uuid.UU
 	for topRows.Next() {
 		var it models.CreatorTopDance
 		if err := topRows.Scan(&it.DanceID, &it.Title, &it.Attempts, &it.Likes); err != nil {
-			logger.Error("failed to scan creator top dance: " + err.Error())
+			logger.Error("failed to scan creator top dance", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		top = append(top, it)
 	}
 	if err := topRows.Err(); err != nil {
-		logger.Error("rows iteration error in GetCreatorAnalytics (top): " + err.Error())
+		logger.Error("rows iteration error in GetCreatorAnalytics (top)", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 
@@ -501,7 +501,7 @@ func (u *UserRepository) GetAttemptOwner(ctx context.Context, attemptID string) 
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		logger.Error("failed to get attempt owner: " + err.Error())
+		logger.Error("failed to get attempt owner", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return ownerID, nil
@@ -518,7 +518,7 @@ func (u *UserRepository) GetLastAttempt(ctx context.Context, userID uuid.UUID, d
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		logger.Error("failed to query last attempt: " + err.Error())
+		logger.Error("failed to query last attempt", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return &it, nil
@@ -533,7 +533,7 @@ func (u *UserRepository) GetPersonalTop(ctx context.Context, userID uuid.UUID) (
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query personal top: " + err.Error())
+		logger.Error("failed to query personal top", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -542,13 +542,13 @@ func (u *UserRepository) GetPersonalTop(ctx context.Context, userID uuid.UUID) (
 	for rows.Next() {
 		var it models.PersonalTopItem
 		if err := rows.Scan(&it.DanceID, &it.UserDanceID, &it.DanceTitle, &it.UserName, &it.BestScore, &it.AchievedAt); err != nil {
-			logger.Error("failed to scan personal top item: " + err.Error())
+			logger.Error("failed to scan personal top item", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, it)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetPersonalTop: " + err.Error())
+		logger.Error("rows iteration error in GetPersonalTop", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return items, nil
@@ -561,7 +561,7 @@ func (u *UserRepository) HasOpenDuel(ctx context.Context, challengerID, opponent
 		return u.db.QueryRow(ctx, HasOpenDuelQuery, challengerID, opponentID, danceID).Scan(&exists)
 	})
 	if err != nil {
-		logger.Error("failed to check open duel: " + err.Error())
+		logger.Error("failed to check open duel", "error", err)
 		return false, users.ErrorInternalServerError
 	}
 	return exists, nil
@@ -576,7 +576,7 @@ func (u *UserRepository) GetActiveDuelsForUserDance(ctx context.Context, userID 
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query active duels for dance: " + err.Error())
+		logger.Error("failed to query active duels for dance", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -585,13 +585,13 @@ func (u *UserRepository) GetActiveDuelsForUserDance(ctx context.Context, userID 
 	for rows.Next() {
 		var it models.ActiveDuelForDance
 		if err := rows.Scan(&it.DuelID, &it.OpponentLogin); err != nil {
-			logger.Error("failed to scan active duel: " + err.Error())
+			logger.Error("failed to scan active duel", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result = append(result, it)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetActiveDuelsForUserDance: " + err.Error())
+		logger.Error("rows iteration error in GetActiveDuelsForUserDance", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil

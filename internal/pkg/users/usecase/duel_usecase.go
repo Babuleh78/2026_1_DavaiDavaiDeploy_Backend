@@ -244,8 +244,6 @@ func (uc *UserUsecase) SubmitDuelAttempt(ctx context.Context, userID uuid.UUID, 
 		logger.Warn("attempt dance_id does not match duel dance_id", "attempt_dance_id", stored.DanceID, "duel_dance_id", duel.DanceID)
 		return users.ErrorBadRequest
 	}
-	// DECISION: dance publication status is not re-checked on submission. The dance was
-
 	validStatuses := map[string]bool{
 		models.DuelStatusActive:         true,
 		models.DuelStatusChallengerDone: true,
@@ -261,7 +259,6 @@ func (uc *UserUsecase) SubmitDuelAttempt(ctx context.Context, userID uuid.UUID, 
 		return users.ErrorForbidden
 	}
 
-	// DECISION: prevent duplicate submission — if the user already submitted, reject.
 	if isChallenger && duel.ChallengerAttemptID != nil {
 		return users.ErrorBadRequest
 	}
@@ -279,7 +276,6 @@ func (uc *UserUsecase) SubmitDuelAttempt(ctx context.Context, userID uuid.UUID, 
 		completedAt         *time.Time
 	)
 
-	// DECISION: on exact score tie the second-to-submit is recorded as winner. Ties are
 	if isChallenger {
 		challengerAttemptID = &attemptID
 		challengerScore = &score
@@ -454,7 +450,6 @@ func (uc *UserUsecase) GetDuelByID(ctx context.Context, userID uuid.UUID, duelID
 		return nil, users.ErrorForbidden
 	}
 
-	// DECISION: hide scores until both sides have submitted to prevent peeking mid-duel.
 	if duel.Status != models.DuelStatusCompleted {
 		duel.ChallengerScore = nil
 		duel.OpponentScore = nil
@@ -511,12 +506,16 @@ func (uc *UserUsecase) publishDuelCompleted(ctx context.Context, challengerID, o
 		if winnerID != nil {
 			winnerStr = winnerID.String()
 		}
-		payload, _ := json.Marshal(map[string]string{
+		payload, mErr := json.Marshal(map[string]string{
 			"challenger_id": challengerID.String(),
 			"opponent_id":   opponentID.String(),
 			"winner_id":     winnerStr,
 			"duel_id":       duelID.String(),
 		})
+		if mErr != nil {
+			logger.Warn("failed to marshal duel.completed payload", "error", mErr)
+			return
+		}
 		uc.kafkaProducer.PublishAsync(ctx, kafka.TopicDuelCompleted, duelID.String(), payload, func(err error) {
 			logger.Warn("kafka publish TopicDuelCompleted failed", "duel_id", duelID, "error", err)
 		})

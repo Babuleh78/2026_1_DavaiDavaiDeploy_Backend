@@ -23,7 +23,7 @@ func (u *UserRepository) CreateDance(ctx context.Context, id, title, status, dif
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to create dance: " + err.Error())
+		logger.Error("failed to create dance", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -50,7 +50,7 @@ func (u *UserRepository) UpdateDanceStatus(ctx context.Context, id, status strin
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to update dance status: " + err.Error())
+		logger.Error("failed to update dance status", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -97,20 +97,20 @@ func (u *UserRepository) GetPublishedDanceIDs(ctx context.Context, ids []string)
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query published dance ids: " + err.Error())
+		logger.Error("failed to query published dance ids", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
-			logger.Error("failed to scan published dance id: " + err.Error())
+			logger.Error("failed to scan published dance id", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result[id] = struct{}{}
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetPublishedDanceIDs: " + err.Error())
+		logger.Error("rows iteration error in GetPublishedDanceIDs", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -123,7 +123,7 @@ func (u *UserRepository) UpdateDanceDifficulty(ctx context.Context, danceID, dif
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to update dance difficulty: " + err.Error())
+		logger.Error("failed to update dance difficulty", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -237,7 +237,7 @@ func (u *UserRepository) GetDanceCatalog(ctx context.Context, sort, search strin
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get dance catalog: " + err.Error())
+		logger.Error("failed to get dance catalog", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -247,7 +247,7 @@ func (u *UserRepository) GetDanceCatalog(ctx context.Context, sort, search strin
 		var item models.DanceCatalogItem
 		var hasAuthor bool
 		if err := rows.Scan(&item.ID, &item.Title, &item.CreatedAt, &item.AttemptCount, &item.AvgScore, &item.ViewCount, &item.LikeCount, &item.DurationSec, &item.DifficultyByUsers, &item.DifficultyScore, &hasAuthor); err != nil {
-			logger.Error("failed to scan catalog item: " + err.Error())
+			logger.Error("failed to scan catalog item", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 
@@ -257,7 +257,7 @@ func (u *UserRepository) GetDanceCatalog(ctx context.Context, sort, search strin
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetDanceCatalog: " + err.Error())
+		logger.Error("rows iteration error in GetDanceCatalog", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	if items == nil {
@@ -287,7 +287,7 @@ func (u *UserRepository) GetDanceCatalogCount(ctx context.Context, sort, search 
 			})
 		}
 		if err != nil {
-			logger.Error("failed to get catalog count: " + err.Error())
+			logger.Error("failed to get catalog count", "error", err)
 			return 0, users.ErrorInternalServerError
 		}
 		return count, nil
@@ -321,7 +321,7 @@ func (u *UserRepository) GetDanceCatalogCount(ctx context.Context, sort, search 
 		return u.db.QueryRow(ctx, query, args...).Scan(&count)
 	})
 	if err != nil {
-		logger.Error("failed to get filtered catalog count: " + err.Error())
+		logger.Error("failed to get filtered catalog count", "error", err)
 		return 0, users.ErrorInternalServerError
 	}
 	return count, nil
@@ -336,7 +336,7 @@ func (u *UserRepository) GetDancesEnrichedInfo(ctx context.Context, ids []string
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get enriched info: " + err.Error())
+		logger.Error("failed to get enriched info", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -346,13 +346,13 @@ func (u *UserRepository) GetDancesEnrichedInfo(ctx context.Context, ids []string
 		var id string
 		var info models.DanceEnrichedInfo
 		if err := rows.Scan(&id, &info.Title, &info.AttemptCount, &info.AvgScore, &info.ViewCount, &info.LikeCount); err != nil {
-			logger.Error("failed to scan enriched info: " + err.Error())
+			logger.Error("failed to scan enriched info", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		result[id] = info
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetDancesEnrichedInfo: " + err.Error())
+		logger.Error("rows iteration error in GetDancesEnrichedInfo", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -367,7 +367,7 @@ func (u *UserRepository) GetDanceTrending(ctx context.Context) ([]models.DanceCa
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get trending dances: " + err.Error())
+		logger.Error("failed to get trending dances", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -376,13 +376,13 @@ func (u *UserRepository) GetDanceTrending(ctx context.Context) ([]models.DanceCa
 	for rows.Next() {
 		var item models.DanceCatalogItem
 		if err := rows.Scan(&item.ID, &item.Title, &item.AttemptCount, &item.AvgScore, &item.ViewCount, &item.LikeCount); err != nil {
-			logger.Error("failed to scan trending item: " + err.Error())
+			logger.Error("failed to scan trending item", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetDanceTrending: " + err.Error())
+		logger.Error("rows iteration error in GetDanceTrending", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	if items == nil {
@@ -400,7 +400,7 @@ func (u *UserRepository) GetDanceStats(ctx context.Context, danceID string) (*mo
 		)
 	})
 	if err != nil {
-		logger.Error("failed to get dance stats: " + err.Error())
+		logger.Error("failed to get dance stats", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return &s, nil
@@ -416,7 +416,7 @@ func (u *UserRepository) GetUploadedDancesByUser(ctx context.Context, userID uui
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to get uploaded dances: " + err.Error())
+		logger.Error("failed to get uploaded dances", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -429,14 +429,14 @@ func (u *UserRepository) GetUploadedDancesByUser(ctx context.Context, userID uui
 			&d.AttemptCount, &d.AvgScore, &d.LikeCount, &d.ViewCount,
 			&d.DifficultyByUsers, &effectiveScore,
 		); err != nil {
-			logger.Error("failed to scan uploaded dance: " + err.Error())
+			logger.Error("failed to scan uploaded dance", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		d.Difficulty = difficultyLabelFromScore(effectiveScore)
 		result = append(result, d)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetUploadedDancesByUser: " + err.Error())
+		logger.Error("rows iteration error in GetUploadedDancesByUser", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return result, nil
@@ -473,7 +473,7 @@ func (u *UserRepository) DeleteDanceAndRelated(ctx context.Context, danceID stri
 
 	tx, err := pool.Begin(ctx)
 	if err != nil {
-		logger.Error("failed to begin transaction for DeleteDanceAndRelated: " + err.Error())
+		logger.Error("failed to begin transaction for DeleteDanceAndRelated", "error", err)
 		return users.ErrorInternalServerError
 	}
 	defer tx.Rollback(ctx)
@@ -490,7 +490,7 @@ func (u *UserRepository) DeleteDanceAndRelated(ctx context.Context, danceID stri
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		logger.Error("failed to commit transaction for DeleteDanceAndRelated: " + err.Error())
+		logger.Error("failed to commit transaction for DeleteDanceAndRelated", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -522,7 +522,7 @@ func (u *UserRepository) GetEffectiveDanceDifficulty(ctx context.Context, danceI
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", false, users.ErrorNotFound
 		}
-		logger.Error("failed to get effective difficulty: " + err.Error())
+		logger.Error("failed to get effective difficulty", "error", err)
 		return "", false, users.ErrorInternalServerError
 	}
 	if ratingCount >= minRatingsForCrowdDifficulty {
@@ -543,7 +543,7 @@ func (u *UserRepository) UpdateDanceTitle(ctx context.Context, danceID string, t
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to update dance title: " + err.Error())
+		logger.Error("failed to update dance title", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -556,7 +556,7 @@ func (u *UserRepository) UpdateDanceDuration(ctx context.Context, danceID string
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to update dance duration: " + err.Error())
+		logger.Error("failed to update dance duration", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -572,7 +572,7 @@ func (u *UserRepository) RecordDanceView(ctx context.Context, danceID string, vi
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to record dance view: " + err.Error())
+		logger.Error("failed to record dance view", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -585,7 +585,7 @@ func (u *UserRepository) GetDanceViewCount(ctx context.Context, danceID string) 
 		return u.db.QueryRow(ctx, GetDanceViewCountQuery, danceID).Scan(&count)
 	})
 	if err != nil {
-		logger.Error("failed to get dance view count: " + err.Error())
+		logger.Error("failed to get dance view count", "error", err)
 		return 0, users.ErrorInternalServerError
 	}
 	return count, nil
@@ -598,7 +598,7 @@ func (u *UserRepository) LinkDanceUpload(ctx context.Context, userID uuid.UUID, 
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to link dance upload: " + err.Error())
+		logger.Error("failed to link dance upload", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil
@@ -613,7 +613,7 @@ func (u *UserRepository) GetDanceUploaders(ctx context.Context, danceID string) 
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to query dance uploaders: " + err.Error())
+		logger.Error("failed to query dance uploaders", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	defer rows.Close()
@@ -622,13 +622,13 @@ func (u *UserRepository) GetDanceUploaders(ctx context.Context, danceID string) 
 	for rows.Next() {
 		var id uuid.UUID
 		if err := rows.Scan(&id); err != nil {
-			logger.Error("failed to scan uploader id: " + err.Error())
+			logger.Error("failed to scan uploader id", "error", err)
 			return nil, users.ErrorInternalServerError
 		}
 		ids = append(ids, id)
 	}
 	if err := rows.Err(); err != nil {
-		logger.Error("rows iteration error in GetDanceUploaders: " + err.Error())
+		logger.Error("rows iteration error in GetDanceUploaders", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return ids, nil
@@ -644,7 +644,7 @@ func (u *UserRepository) GetDanceAuthor(ctx context.Context, danceID string) (*m
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil
 		}
-		logger.Error("failed to query dance author: " + err.Error())
+		logger.Error("failed to query dance author", "error", err)
 		return nil, users.ErrorInternalServerError
 	}
 	return &author, nil
@@ -657,7 +657,7 @@ func (u *UserRepository) SetDanceModerationReason(ctx context.Context, danceID, 
 		return e
 	})
 	if err != nil {
-		logger.Error("failed to set moderation reason: " + err.Error())
+		logger.Error("failed to set moderation reason", "error", err)
 		return users.ErrorInternalServerError
 	}
 	return nil

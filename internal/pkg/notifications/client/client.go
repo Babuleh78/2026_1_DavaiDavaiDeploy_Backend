@@ -29,7 +29,11 @@ func (c *NotificationsGRPCClient) SendDuelNotification(ctx context.Context, toUs
 	}
 	payload["duel_id"] = duelID
 
-	payloadJSON, _ := json.Marshal(payload)
+	payloadJSON, mErr := json.Marshal(payload)
+	if mErr != nil {
+		slog.Warn("notifications client: failed to marshal payload", "error", mErr)
+		payloadJSON = []byte("{}")
+	}
 
 	fromID := ""
 	if fromUserID != nil {
